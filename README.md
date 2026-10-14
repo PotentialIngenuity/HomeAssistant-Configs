@@ -1,35 +1,33 @@
-# B-hyve irrigation for Home Assistant
+# Home Assistant configs
 
-An Irrigation dashboard and the scripts behind it for two 4-zone B-hyve timers (8 zones). Set each zone's run time, drag the zones into order, and give the whole series one start time; each zone starts when the one before it finishes. The page also shows what's watering now, the plan for the next run, rain delays, timer health and each zone's last run.
+My Home Assistant configuration, kept as files. Each feature is a **page**: a package with its helpers and scripts, a view on the Home dashboard, and a doc that explains it. Pages are independent, so you can install one without the others.
 
-![The Irrigation page during a cycle: zone 6 watering, 5 of 7 in the cycle](preview/irrigation-preview.png)
+## Pages
 
-`preview/irrigation-preview.html` is a standalone mock of the page with sample data (the screenshot above is taken from it). Open it in a browser to try the layout before installing.
+| Page | What it does | Doc |
+|---|---|---|
+| Irrigation | B-hyve sprinkler timers: run times, zone order with one start time, watering plan, live progress, rain delay and health | [docs/irrigation.md](docs/irrigation.md) |
 
-## Files
+## Layout
 
-Files mirror the Home Assistant `/config` folder. Copy them into place, keeping the same paths.
+Files mirror the Home Assistant `/config` folder, so each one is copied to the same path there. Everything that belongs to a page is named after it.
 
 ```
-packages/irrigation.yaml              helpers, scripts and template sensors
-dashboards/home/dashboard.yaml        the "Home" dashboard (one file per view under views/)
-dashboards/home/views/irrigation.yaml the Irrigation page
-www/bhyve-zone-order-card.js          drag-and-drop card for the zone order
-preview/irrigation-preview.html       standalone preview (not needed in HA)
-preview/irrigation-preview.png        screenshot of the preview, used in this README
+packages/<page>.yaml                 helpers, scripts, template sensors, automations
+dashboards/home/dashboard.yaml       the Home dashboard; lists one view per page
+dashboards/home/views/<page>.yaml    the page itself
+www/<card>.js                        custom cards a page needs (served at /local/<card>.js)
+docs/<page>.md                       what the page does, its setup, entity IDs, troubleshooting
+preview/<page>-preview.html, .png    optional standalone mock of the page and a screenshot
 ```
 
-## Requirements
-
-- Home Assistant 2024.10 or newer.
-- From HACS:
-  1. **B-hyve** integration: https://github.com/sebr/bhyve-home-assistant
-  2. **Scheduler component** (runs the schedules): https://github.com/nielsfaber/scheduler-component. After installing, add it under Settings → Devices & services.
-  3. **Scheduler card** (the schedule editor on the page): https://github.com/nielsfaber/scheduler-card
+`docs/` and `preview/` are documentation only; they don't need to be copied to Home Assistant.
 
 ## Setup
 
-1. **Copy the files** into `/config`, keeping their paths.
+Do this once. After that, each page's doc lists what that page needs.
+
+1. **Install any HACS integrations and cards** listed in the doc of the pages you want.
 2. **Add to `configuration.yaml`**, or merge into the blocks you already have:
 
    ```yaml
@@ -47,110 +45,36 @@ preview/irrigation-preview.png        screenshot of the preview, used in this RE
          filename: dashboards/home/dashboard.yaml
    ```
 
-3. **Rename your B-hyve entities** to the IDs in [Entity IDs](#entity-ids) below. Then the files need no edits.
-4. **Restart Home Assistant.**
-5. **Register the Order card** (once):
-   1. Turn on Advanced mode in your user profile if it's off.
-   2. Settings → Dashboards → ⋮ (top right) → Resources → Add resource.
-   3. URL `/local/bhyve-zone-order-card.js`, type **JavaScript module**. Create, then refresh the browser.
-6. **Set it up on the page:**
-   - Set each zone's run time with its slider.
-   - Drag the zones into order in the Watering plan section.
-   - In Schedules, add one schedule for **Run all zones** (or a timer cycle) at the time you want watering to start.
-   - Turn off the B-hyve app's own programs (`switch.*_program` in HA) so the timer and HA don't both water.
+   `packages:` loads every file in `packages/`, so new pages are picked up without editing this again. The Home dashboard is YAML-managed (edit the files, not the UI); your other dashboards stay as they are.
+3. **Copy the files** for the pages you want, keeping their paths, plus `dashboards/home/dashboard.yaml`. If you skip a page, remove its `!include` line from `dashboard.yaml`.
+4. **Follow each page's doc** (entity IDs to rename, custom cards to register), then restart Home Assistant.
 
-## Entity IDs
+## Custom cards
 
-The easiest setup is to **rename your B-hyve entities to match** these IDs: open Settings → Entities, select the entity, click the gear icon and edit "Entity ID". Give the zones friendly names (e.g. "Front lawn") in the same dialog; the page uses them everywhere.
+Cards in `www/` are registered once as dashboard resources:
 
-| Entity ID | What it is |
+1. Turn on Advanced mode in your user profile if it's off.
+2. Settings → Dashboards → ⋮ (top right) → Resources → Add resource.
+3. URL `/local/<card>.js`, type **JavaScript module**. Create, then refresh the browser.
+
+| Card | Used by |
 |---|---|
-| `valve.bhyve_zone_1` … `valve.bhyve_zone_4` | Timer 1 zones |
-| `valve.bhyve_zone_5` … `valve.bhyve_zone_8` | Timer 2 zones |
-| `switch.bhyve_timer_1_rain_delay`, `switch.bhyve_timer_2_rain_delay` | Rain delay |
-| `select.bhyve_timer_1_mode`, `select.bhyve_timer_2_mode` | Timer mode (auto/off) |
-| `sensor.bhyve_timer_1_next_watering`, `sensor.bhyve_timer_2_next_watering` | Next watering |
-| `sensor.bhyve_zone_1_history` … `sensor.bhyve_zone_8_history` | Zone history (last run, minutes, gallons) |
-| `binary_sensor.bhyve_timer_1_fault`, `binary_sensor.bhyve_timer_2_fault` | Station faults |
-| `binary_sensor.bhyve_hub_connected` | Wi-Fi hub online (only if you have a hub) |
-| `sensor.bhyve_timer_1_battery`, `sensor.bhyve_timer_2_battery` | Battery level (only on battery-powered timers) |
-
-The history, battery and connectivity sensors are marked as diagnostic, so look under the device's Diagnostic list if they don't appear in the main one. If you have no Wi-Fi hub or your timers aren't battery-powered, skip those rows: the page hides tiles for entities that don't exist.
-
-The scripts find a zone's helpers from its valve's ID (`valve.bhyve_zone_3` → `input_number.bhyve_zone_3_minutes`), so keep the valve IDs as listed.
-
-### Created by the package
-
-| Entity ID | What it is |
-|---|---|
-| `input_number.bhyve_zone_N_minutes` | Zone run time, 0–60 min (0 skips the zone) |
-| `input_number.bhyve_zone_N_order` | Zone position in a cycle, 1–8 (set by the Order card) |
-| `counter.bhyve_watering_budget` | Watering budget, 10–200 % (starts at 100) |
-| `input_number.bhyve_rain_delay_hours` | Length of a rain delay started from the page |
-| `script.bhyve_run_all`, `script.bhyve_timer_1_cycle`, `script.bhyve_timer_2_cycle` | Cycles: all zones, or one timer's zones |
-| `script.bhyve_run_zones` | Runs a list of zones in order (every cycle goes through it) |
-| `script.bhyve_water_zone` | Waters one zone |
-| `script.bhyve_skip_zone`, `script.bhyve_stop_all` | Skip to the next zone; stop everything |
-| `script.bhyve_toggle_rain_delay` | Starts or cancels a rain delay |
-| `sensor.watering_zone`, `sensor.watering_progress`, `sensor.watering_ends` | The zone watering now, its progress and end time |
-| `sensor.watering_cycle`, `sensor.watering_cycle_ends` | Position in the running cycle ("3 of 6") and its end time |
-| `sensor.watering_order` | Zone order and budget-scaled run times |
-| `sensor.timer_1_rain_delay_status`, `sensor.timer_2_rain_delay_status` | Rain delay time left and reason |
-
-## The Irrigation page
-
-From top to bottom:
-
-- **Now watering** (only while a zone is open or a cycle is running): which zone, a progress gauge, and when it finishes. During a cycle it also shows where you are ("3 of 6") and when the whole cycle finishes, and it stays up between zones. It works no matter what started the zone: a cycle, a tile, a schedule or the B-hyve app. The gauge moves once a minute.
-  - **Skip zone** ends the zone that's watering. In a cycle, the next zone starts about 5 seconds later instead of waiting out the rest of the run time.
-  - **Stop all** cancels running and queued cycles and closes every zone.
-- **Timers**
-  - Each timer's mode and next run.
-  - **Rain delay**: shows time left and the reason ("18 h left · Rain"). Tap to start a delay of the length set below it (24–168 h), or to cancel the one running.
-  - **Run all zones** and **Stop all**.
-  - **Health**: fault status for each timer, the Wi-Fi hub's connection and each timer's battery.
-- **Timer 1 zones / Timer 2 zones**
-  - **Zone tiles**: tap to water that zone for its run time, hold for details.
-  - **Run times**: a slider per zone.
-  - **Last run**: when each zone last watered, for how long, and how much water it used. Water shows "—" if B-hyve doesn't report it.
-- **Watering plan**
-  - **Watering budget**: scales every run time, for seasonal changes. Reset puts it back to 100 %.
-  - **Plan**: the next scheduled cycle with each zone's start and end time, the total, and when it finishes. It updates as you change run times, the order or the budget, and notes skipped zones and rain delays. With no cycle scheduled, times show as offsets from the start (+0:15).
-  - **Order**: drag the zones into order (on a keyboard, focus a handle and use the arrow keys).
-- **Schedules**: the Scheduler card. See [Schedules](#schedules).
-
-## How cycles work
-
-- Only one zone waters at a time, across both timers.
-- **Run all** waters all eight zones; **Timer 1** and **Timer 2** water just that timer's four. All of them follow the order from the Order card, lowest position first. Zones with the same position go by zone number.
-- Each zone waters for its run time **scaled by the budget**, then the next zone starts after a 30-second buffer. A zone set above 0 always gets at least 1 minute.
-- Zones with a run time of 0 are skipped, and so are a timer's zones while its rain delay is on.
-- Every cycle goes through one queued script, so if two cycles start together, the second waits for the first to finish.
-- Tapping a zone tile also uses the budget-scaled run time.
-
-## Schedules
-
-In the Schedules card you can schedule:
-
-- a **cycle** (recommended): one start time waters the zones in order, and you change the durations with the sliders and the budget, or
-- a **single zone** with "Water for N minutes". This time isn't scaled by the budget.
-
-Single-zone schedules don't go through the queue. Space them at least as far apart as the run time, or they'll overlap.
-
-The schedules run in Home Assistant, so nothing waters while HA is down. The B-hyve app's own programs run on the timer itself. Turn those programs off (the integration exposes them as `switch.*_program`) so the two don't both water.
+| `bhyve-zone-order-card.js` | Irrigation |
 
 ## Updating
 
 | You changed | Then |
 |---|---|
 | A dashboard file | Refresh the browser |
-| `packages/irrigation.yaml` | Developer tools → YAML → reload Scripts, Input numbers, Counters and Template entities. Restart instead if the change adds a new kind of helper. |
-| `www/bhyve-zone-order-card.js` | Refresh with the cache cleared, or bump the resource URL to `/local/bhyve-zone-order-card.js?v=2` (then `?v=3`, …) |
+| A package | Developer tools → YAML → reload the kinds of entities it defines (the page's doc lists them). Restart instead if you added a new package or a new kind of helper. |
+| A card in `www/` | Refresh with the cache cleared, or bump the resource URL (`/local/<card>.js?v=2`, then `?v=3`, …) |
 
-## Troubleshooting
+## Adding a page
 
-- **"Custom element doesn't exist: bhyve-zone-order-card"**: the card isn't registered (setup step 5), or the browser has an old copy cached. Check the resource URL, then refresh with the cache cleared.
-- **A tile says "Entity not available"**: a B-hyve entity hasn't been renamed to the ID in the table above.
-- **The plan shows +0:15 instead of clock times**: no enabled schedule runs a cycle. Schedules for a single zone don't count.
-- **Now watering doesn't appear**: check that `sensor.watering_zone` changes from Idle when a zone opens (Developer tools → States). If it stays Idle, the valve IDs don't match `valve.bhyve_zone_N`.
-- **Times are off by a minute**: each zone's start includes the 30-second buffer after the zone before it, and times are rounded down to the minute.
+1. Pick a short name, e.g. `lighting`, and use it for every file below.
+2. `packages/lighting.yaml`: the page's helpers, scripts and template sensors. Prefix entity IDs with the page or device name so pages don't collide.
+3. `dashboards/home/views/lighting.yaml`: the view (`title`, `path`, `icon`, `type: sections`), then add `- !include views/lighting.yaml` to `dashboards/home/dashboard.yaml`.
+4. Any custom card goes in `www/`; add it to the [Custom cards](#custom-cards) table.
+5. `docs/lighting.md`: what it does, requirements, setup, entity IDs, how it works, troubleshooting. [docs/irrigation.md](docs/irrigation.md) is a good model.
+6. Optionally, `preview/lighting-preview.html` and a screenshot for the doc.
+7. Add a row to the [Pages](#pages) table.

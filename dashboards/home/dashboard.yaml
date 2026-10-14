@@ -1,4 +1,5 @@
-# Home dashboard. Each view lives in its own file under views/.
+# Home dashboard. Each page is one view, in its own file under views/.
+# See the repo README ("Adding a page") for the conventions.
 title: Home
 views:
   - !include views/irrigation.yaml
