@@ -1,0 +1,455 @@
+# B-hyve irrigation package
+#
+# Two B-hyve timers, four zones each:
+#   Timer 1 -> valve.bhyve_zone_1 .. valve.bhyve_zone_4
+#   Timer 2 -> valve.bhyve_zone_5 .. valve.bhyve_zone_8
+#
+# Each zone's run time comes from input_number.<zone object id>_minutes,
+# e.g. valve.bhyve_zone_3 -> input_number.bhyve_zone_3_minutes. 0 skips the zone.
+#
+# Only one zone waters at a time, across both timers. Every cycle goes through
+# script.bhyve_run_zones, which is queued: if a second cycle is started while one
+# is running, it waits its turn instead of overlapping.
+#
+# Cycles water their zones in the order set by input_number.bhyve_zone_N_order
+# (lowest first; ties go by zone number).
+#
+# counter.bhyve_watering_budget scales every run time (100 = as set). The scaled
+# minutes live on sensor.watering_order, and everything that waters a zone for
+# its run time reads them from there.
+
+# A counter, not an input_number: it starts at 100 on first install and keeps
+# its value across restarts. Reset puts it back to 100.
+counter:
+  bhyve_watering_budget:
+    name: Watering budget
+    icon: mdi:percent-circle-outline
+    initial: 100
+    step: 10
+    minimum: 10
+    maximum: 200
+    restore: true
+
+input_number:
+  bhyve_zone_1_minutes: &zone_minutes
+    name: Zone 1 run time
+    min: 0
+    max: 60
+    step: 1
+    unit_of_measurement: min
+    mode: slider
+    icon: mdi:timer-outline
+  bhyve_zone_2_minutes:
+    <<: *zone_minutes
+    name: Zone 2 run time
+  bhyve_zone_3_minutes:
+    <<: *zone_minutes
+    name: Zone 3 run time
+  bhyve_zone_4_minutes:
+    <<: *zone_minutes
+    name: Zone 4 run time
+  bhyve_zone_5_minutes:
+    <<: *zone_minutes
+    name: Zone 5 run time
+  bhyve_zone_6_minutes:
+    <<: *zone_minutes
+    name: Zone 6 run time
+  bhyve_zone_7_minutes:
+    <<: *zone_minutes
+    name: Zone 7 run time
+  bhyve_zone_8_minutes:
+    <<: *zone_minutes
+    name: Zone 8 run time
+  # Position of each zone in a cycle. Lowest runs first; ties go by zone number.
+  bhyve_zone_1_order: &zone_order
+    name: Zone 1 order
+    min: 1
+    max: 8
+    step: 1
+    mode: box
+    icon: mdi:order-numeric-ascending
+  bhyve_zone_2_order:
+    <<: *zone_order
+    name: Zone 2 order
+  bhyve_zone_3_order:
+    <<: *zone_order
+    name: Zone 3 order
+  bhyve_zone_4_order:
+    <<: *zone_order
+    name: Zone 4 order
+  bhyve_zone_5_order:
+    <<: *zone_order
+    name: Zone 5 order
+  bhyve_zone_6_order:
+    <<: *zone_order
+    name: Zone 6 order
+  bhyve_zone_7_order:
+    <<: *zone_order
+    name: Zone 7 order
+  bhyve_zone_8_order:
+    <<: *zone_order
+    name: Zone 8 order
+  # How long a rain delay lasts when you start one from the dashboard.
+  bhyve_rain_delay_hours:
+    name: Rain delay length
+    min: 24
+    max: 168
+    step: 24
+    unit_of_measurement: h
+    mode: box
+    icon: mdi:weather-rainy
+
+script:
+  # Waters one zone, for its run time scaled by the budget unless minutes is given.
+  bhyve_water_zone:
+    alias: Water one zone
+    icon: mdi:sprinkler
+    mode: parallel
+    fields:
+      zone:
+        name: Zone
+        required: true
+        selector:
+          entity:
+            domain: valve
+      minutes:
+        name: Minutes
+        description: Leave empty to use the zone's run time, scaled by the budget.
+        selector:
+          number:
+            min: 1
+            max: 60
+            unit_of_measurement: min
+    sequence:
+      - variables:
+          mins: >-
+            {{ (minutes if minutes is defined
+                else (state_attr('sensor.watering_order', 'minutes') or {}).get(zone,
+                      states('input_number.' ~ zone.split('.')[1] ~ '_minutes'))) | int(0) }}
+      - condition: template
+        value_template: "{{ mins > 0 }}"
+      - action: bhyve.start_watering
+        data:
+          entity_id: "{{ zone }}"
+          minutes: "{{ mins }}"
+
+  # Runs a list of zones one after another, in the zones' set order, each for
+  # its budget-scaled run time. Queued, so only one list runs at a time.
+  # A zone is skipped while its timer's rain delay is on.
+  # Each zone start fires a bhyve_cycle event, which sensor.watering_cycle shows.
+  # script.bhyve_skip_zone ends the current zone early.
+  bhyve_run_zones:
+    alias: Run zones in sequence
+    icon: mdi:sprinkler-variant
+    mode: queued
+    max: 10
+    fields:
+      zones:
+        name: Zones
+        required: true
+        selector:
+          entity:
+            domain: valve
+            multiple: true
+    sequence:
+      # The zones that will run, in order, with their minutes.
+      - variables:
+          plan: >-
+            {% set ordered = state_attr('sensor.watering_order', 'zones') %}
+            {% set scaled = state_attr('sensor.watering_order', 'minutes') or {} %}
+            {% set ns = namespace(out=[]) %}
+            {% for z in (ordered | select('in', zones) | list if ordered else zones) %}
+              {% set m = scaled.get(z, states('input_number.' ~ z.split('.')[1] ~ '_minutes')) | int(0) %}
+              {% set rd = device_entities(device_id(z)) | select('match', 'switch\\..*rain_delay') | first | default('') %}
+              {% if m > 0 and not is_state(rd, 'on') %}
+                {% set ns.out = ns.out + [{'zone': z, 'minutes': m}] %}
+              {% endif %}
+            {% endfor %}
+            {{ ns.out }}
+      - repeat:
+          for_each: "{{ plan }}"
+          sequence:
+            # A rain delay may have started since the plan was made.
+            - variables:
+                rain_delay: >-
+                  {{ device_entities(device_id(repeat.item.zone))
+                     | select('match', 'switch\\..*rain_delay') | first | default('') }}
+            - if: "{{ not is_state(rain_delay, 'on') }}"
+              then:
+                - event: bhyve_cycle
+                  event_data:
+                    zones: "{{ plan | map(attribute='zone') | list }}"
+                    index: "{{ repeat.index }}"
+                    # Remaining zones' minutes plus the buffer after each one.
+                    ends: >-
+                      {% set left = plan[repeat.index - 1:] %}
+                      {{ (now() + timedelta(minutes=(left | sum(attribute='minutes')) + 0.5 * (left | count))).isoformat() }}
+                - action: bhyve.start_watering
+                  data:
+                    entity_id: "{{ repeat.item.zone }}"
+                    minutes: "{{ repeat.item.minutes }}"
+                # Wait out the run plus a short buffer, or until Skip zone is pressed.
+                - wait_for_trigger:
+                    - trigger: event
+                      event_type: bhyve_skip_zone
+                  timeout:
+                    minutes: "{{ repeat.item.minutes }}"
+                    seconds: 30
+                  continue_on_timeout: true
+                - if: "{{ wait.trigger is not none }}"
+                  then:
+                    # Give the timer a moment to close the skipped zone.
+                    - delay:
+                        seconds: 5
+
+  # Ends the zone that is watering. In a cycle, the next zone starts right away.
+  bhyve_skip_zone:
+    alias: Skip to the next zone
+    icon: mdi:skip-next
+    mode: single
+    sequence:
+      - variables:
+          open_zones: >-
+            {{ states.valve | selectattr('object_id', 'match', 'bhyve_zone_')
+               | selectattr('state', 'eq', 'open') | map(attribute='entity_id') | list }}
+      - if: "{{ open_zones | count > 0 }}"
+        then:
+          - action: bhyve.stop_watering
+            data:
+              entity_id: "{{ open_zones }}"
+      - event: bhyve_skip_zone
+
+  bhyve_timer_1_cycle:
+    alias: Timer 1 – run its zones
+    icon: mdi:sprinkler-variant
+    mode: single
+    sequence:
+      - action: script.bhyve_run_zones
+        data:
+          zones:
+            - valve.bhyve_zone_1
+            - valve.bhyve_zone_2
+            - valve.bhyve_zone_3
+            - valve.bhyve_zone_4
+
+  bhyve_timer_2_cycle:
+    alias: Timer 2 – run its zones
+    icon: mdi:sprinkler-variant
+    mode: single
+    sequence:
+      - action: script.bhyve_run_zones
+        data:
+          zones:
+            - valve.bhyve_zone_5
+            - valve.bhyve_zone_6
+            - valve.bhyve_zone_7
+            - valve.bhyve_zone_8
+
+  bhyve_run_all:
+    alias: Run all zones
+    icon: mdi:water
+    mode: single
+    sequence:
+      - action: script.bhyve_run_zones
+        data:
+          zones:
+            - valve.bhyve_zone_1
+            - valve.bhyve_zone_2
+            - valve.bhyve_zone_3
+            - valve.bhyve_zone_4
+            - valve.bhyve_zone_5
+            - valve.bhyve_zone_6
+            - valve.bhyve_zone_7
+            - valve.bhyve_zone_8
+
+  # Starts a rain delay of input_number.bhyve_rain_delay_hours, or cancels the one running.
+  bhyve_toggle_rain_delay:
+    alias: Start or cancel a rain delay
+    icon: mdi:weather-rainy
+    mode: queued
+    fields:
+      rain_delay:
+        name: Rain delay switch
+        required: true
+        selector:
+          entity:
+            domain: switch
+    sequence:
+      - if: "{{ is_state(rain_delay, 'on') }}"
+        then:
+          - action: bhyve.disable_rain_delay
+            data:
+              entity_id: "{{ rain_delay }}"
+        else:
+          - action: bhyve.enable_rain_delay
+            data:
+              entity_id: "{{ rain_delay }}"
+              hours: "{{ states('input_number.bhyve_rain_delay_hours') | int(24) }}"
+
+  bhyve_stop_all:
+    alias: Stop all watering
+    icon: mdi:water-off
+    mode: restart
+    sequence:
+      - action: script.turn_off
+        target:
+          entity_id:
+            - script.bhyve_run_all
+            - script.bhyve_timer_1_cycle
+            - script.bhyve_timer_2_cycle
+            - script.bhyve_run_zones
+      - action: bhyve.stop_watering
+        data:
+          entity_id:
+            - valve.bhyve_zone_1
+            - valve.bhyve_zone_2
+            - valve.bhyve_zone_3
+            - valve.bhyve_zone_4
+            - valve.bhyve_zone_5
+            - valve.bhyve_zone_6
+            - valve.bhyve_zone_7
+            - valve.bhyve_zone_8
+
+# What is watering right now, for the "Now watering" panel on the dashboard.
+# B-hyve reports the start time and run time on the open valve. If the cloud
+# hasn't sent them yet, fall back to when the valve opened and the zone's
+# budget-scaled run time.
+template:
+  - sensor:
+      - name: Watering zone
+        unique_id: bhyve_watering_zone
+        icon: mdi:sprinkler-variant
+        state: >-
+          {% set v = states.valve | selectattr('object_id', 'match', 'bhyve_zone_')
+                     | selectattr('state', 'eq', 'open') | first | default(none) %}
+          {{ v.name if v else 'Idle' }}
+        attributes:
+          valve: >-
+            {% set v = states.valve | selectattr('object_id', 'match', 'bhyve_zone_')
+                       | selectattr('state', 'eq', 'open') | first | default(none) %}
+            {{ v.entity_id if v else none }}
+          started: >-
+            {% set v = states.valve | selectattr('object_id', 'match', 'bhyve_zone_')
+                       | selectattr('state', 'eq', 'open') | first | default(none) %}
+            {{ (as_datetime(v.attributes.started_watering_station_at | string, v.last_changed)
+                if v.attributes.started_watering_station_at is defined
+                else v.last_changed).isoformat() if v else none }}
+          run_minutes: >-
+            {% set v = states.valve | selectattr('object_id', 'match', 'bhyve_zone_')
+                       | selectattr('state', 'eq', 'open') | first | default(none) %}
+            {{ (v.attributes.current_runtime | float(0)
+                or (state_attr('sensor.watering_order', 'minutes') or {}).get(v.entity_id, 0) | float(0)) if v else none }}
+
+      # Shown on a tile as a live countdown ("in 7 minutes").
+      - name: Watering ends
+        unique_id: bhyve_watering_ends
+        device_class: timestamp
+        icon: mdi:timer-sand
+        state: >-
+          {% set start = state_attr('sensor.watering_zone', 'started') %}
+          {% set mins = state_attr('sensor.watering_zone', 'run_minutes') | float(0) %}
+          {{ (as_datetime(start) + timedelta(minutes=mins)).isoformat()
+             if start and mins > 0 else none }}
+
+      # Updates once a minute while a zone is open.
+      - name: Watering progress
+        unique_id: bhyve_watering_progress
+        unit_of_measurement: "%"
+        icon: mdi:progress-clock
+        state: >-
+          {% set start = state_attr('sensor.watering_zone', 'started') %}
+          {% set mins = state_attr('sensor.watering_zone', 'run_minutes') | float(0) %}
+          {% if start and mins > 0 %}
+            {{ ([0, (now() - as_datetime(start)).total_seconds() / (mins * 60) * 100, 100]
+                | sort)[1] | round(0) }}
+          {% else %}0{% endif %}
+
+      # Every zone, sorted by its order helper (zones attribute), and each
+      # zone's run time scaled by the budget (minutes attribute). Cycles, the
+      # Watering plan card and the Order card read them from here.
+      - name: Watering order
+        unique_id: bhyve_watering_order
+        icon: mdi:order-numeric-ascending
+        state: >-
+          {% set ns = namespace(items=[]) %}
+          {% for n in range(1, 9) %}
+            {% set ns.items = ns.items + [{'n': n, 'k': states('input_number.bhyve_zone_' ~ n ~ '_order') | int(n) * 10 + n}] %}
+          {% endfor %}
+          {{ ns.items | sort(attribute='k') | map(attribute='n') | join(', ') }}
+        attributes:
+          zones: >-
+            {% set ns = namespace(items=[]) %}
+            {% for n in range(1, 9) %}
+              {% set ns.items = ns.items + [{'z': 'valve.bhyve_zone_' ~ n, 'k': states('input_number.bhyve_zone_' ~ n ~ '_order') | int(n) * 10 + n}] %}
+            {% endfor %}
+            {{ ns.items | sort(attribute='k') | map(attribute='z') | list }}
+          # A zone set above 0 keeps at least 1 minute.
+          minutes: >-
+            {% set b = states('counter.bhyve_watering_budget') | float(100) / 100 %}
+            {% set ns = namespace(out={}) %}
+            {% for n in range(1, 9) %}
+              {% set m = states('input_number.bhyve_zone_' ~ n ~ '_minutes') | float(0) %}
+              {% set ns.out = dict(ns.out, **{'valve.bhyve_zone_' ~ n: ([1, (m * b) | round(0)] | max) | int if m > 0 else 0}) %}
+            {% endfor %}
+            {{ ns.out }}
+
+      # "Off", or how long the rain delay has left and why, e.g. "18 h left · Rain".
+      - name: Timer 1 rain delay status
+        unique_id: bhyve_timer_1_rain_delay_status
+        icon: >-
+          {{ 'mdi:weather-pouring' if is_state('switch.bhyve_timer_1_rain_delay', 'on')
+             else 'mdi:weather-partly-cloudy' }}
+        state: >-
+          {% set s = 'switch.bhyve_timer_1_rain_delay' %}
+          {% if is_state(s, 'on') %}
+            {% set start = as_datetime(state_attr(s, 'started_at') | string, none) %}
+            {% set hrs = state_attr(s, 'delay') | float(0) %}
+            {% set why = state_attr(s, 'weather_type') | string | lower %}
+            {% set left = ((start + timedelta(hours=hrs) - now()).total_seconds() / 3600)
+                          | round(0, 'ceil') | int if start and hrs > 0 else none %}
+            {{ 'On' if left is none else (left ~ ' h left' if left > 0 else 'Ending') }}
+            {{- ' · ' ~ why | capitalize if why not in ['', 'none', 'unknown'] else '' }}
+          {% else %}Off{% endif %}
+      - name: Timer 2 rain delay status
+        unique_id: bhyve_timer_2_rain_delay_status
+        icon: >-
+          {{ 'mdi:weather-pouring' if is_state('switch.bhyve_timer_2_rain_delay', 'on')
+             else 'mdi:weather-partly-cloudy' }}
+        state: >-
+          {% set s = 'switch.bhyve_timer_2_rain_delay' %}
+          {% if is_state(s, 'on') %}
+            {% set start = as_datetime(state_attr(s, 'started_at') | string, none) %}
+            {% set hrs = state_attr(s, 'delay') | float(0) %}
+            {% set why = state_attr(s, 'weather_type') | string | lower %}
+            {% set left = ((start + timedelta(hours=hrs) - now()).total_seconds() / 3600)
+                          | round(0, 'ceil') | int if start and hrs > 0 else none %}
+            {{ 'On' if left is none else (left ~ ' h left' if left > 0 else 'Ending') }}
+            {{- ' · ' ~ why | capitalize if why not in ['', 'none', 'unknown'] else '' }}
+          {% else %}Off{% endif %}
+
+  # The cycle in progress: "3 of 6" and when the whole cycle should finish.
+  # Set by the bhyve_cycle event from script.bhyve_run_zones; cleared when that
+  # script stops (finished, or Stop all) and on restart.
+  - triggers:
+      - trigger: event
+        event_type: bhyve_cycle
+        id: step
+      - trigger: state
+        entity_id: script.bhyve_run_zones
+        to: "off"
+      - trigger: homeassistant
+        event: start
+    sensor:
+      - name: Watering cycle
+        unique_id: bhyve_watering_cycle
+        icon: mdi:format-list-numbered
+        state: >-
+          {{ trigger.event.data.index ~ ' of ' ~ trigger.event.data.zones | count
+             if trigger.id == 'step' else 'Idle' }}
+        attributes:
+          zones: "{{ trigger.event.data.zones if trigger.id == 'step' else [] }}"
+      - name: Watering cycle ends
+        unique_id: bhyve_watering_cycle_ends
+        device_class: timestamp
+        icon: mdi:flag-checkered
+        state: "{{ trigger.event.data.ends if trigger.id == 'step' else none }}"

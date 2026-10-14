@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>B-hyve Irrigation Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0&display=swap">
+<style>
+/* Layout: a mock of Home Assistant's default theme, sections view, max 3 columns. */
+:root {
+  --bg: #f4f5f7;
+  --card: #ffffff;
+  --fg: #212121;
+  --muted: #727272;
+  --line: #e3e5e8;
+  --primary: #009ac7;
+  --water: #2b8be8;
+  --water-tint: rgba(43,139,232,.14);
+  --grey-tint: rgba(114,114,114,.12);
+  --red: #db4437;
+  --red-tint: rgba(219,68,55,.13);
+  --amber: #e8a200;
+  --amber-tint: rgba(232,162,0,.15);
+  --toolbar: #ffffff;
+  --note-bg: #fff6dd;
+  --note-fg: #6b5000;
+  --track: #d5d9de;
+  --scrim: rgba(0,0,0,.4);
+  --font: "Roboto", "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #111111; --card: #1c1c1c; --fg: #e1e1e1; --muted: #9b9b9b; --line: #2e2e2e;
+  --primary: #22b5e3; --water: #5aa8f5; --water-tint: rgba(90,168,245,.18); --grey-tint: rgba(155,155,155,.16);
+  --red: #f0675b; --red-tint: rgba(240,103,91,.18); --amber: #f2b632; --amber-tint: rgba(242,182,50,.18);
+  --toolbar: #1c1c1c; --note-bg: #2d2610; --note-fg: #e9cf86; --track: #3a3a3a; --scrim: rgba(0,0,0,.6);
+  color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --bg: #111111; --card: #1c1c1c; --fg: #e1e1e1; --muted: #9b9b9b; --line: #2e2e2e;
+  --primary: #22b5e3; --water: #5aa8f5; --water-tint: rgba(90,168,245,.18); --grey-tint: rgba(155,155,155,.16);
+  --red: #f0675b; --red-tint: rgba(240,103,91,.18); --amber: #f2b632; --amber-tint: rgba(242,182,50,.18);
+  --toolbar: #1c1c1c; --note-bg: #2d2610; --note-fg: #e9cf86; --track: #3a3a3a; --scrim: rgba(0,0,0,.6);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+/* Classes below set display, which would otherwise override the hidden attribute. */
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 14px; }
+.ms { font-family: "Material Symbols Rounded"; font-weight: normal; font-style: normal; font-size: 24px; line-height: 1;
+  letter-spacing: normal; text-transform: none; white-space: nowrap; direction: ltr; -webkit-font-smoothing: antialiased; font-feature-settings: "liga"; }
+
+.note { background: var(--note-bg); color: var(--note-fg); padding: 10px 16px; font-size: 13px; line-height: 1.45; }
+.note b { font-weight: 500; }
+
+.toolbar { background: var(--toolbar); border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 12px; padding: 0 16px; height: 56px; }
+.toolbar .title { font-size: 20px; font-weight: 400; flex: 1; }
+.toolbar .ms { color: var(--muted); }
+.tabs { background: var(--toolbar); display: flex; gap: 4px; padding: 0 16px; border-bottom: 1px solid var(--line); }
+.tab { padding: 12px 16px; font-weight: 500; color: var(--primary); border-bottom: 2px solid var(--primary); display: flex; gap: 8px; align-items: center; font-size: 14px; }
+.tab .ms { font-size: 20px; }
+
+.view { max-width: 1260px; margin: 0 auto; padding: 16px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px 16px; align-items: start; }
+.section { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; min-width: 0; }
+.section.full { grid-column: 1 / -1; grid-template-columns: 1fr; }
+@media (max-width: 1000px) { .view { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .view { grid-template-columns: 1fr; } }
+
+.heading { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; padding: 10px 4px 6px; min-height: 44px; }
+.heading .ms { font-size: 22px; color: var(--muted); }
+.heading h2 { margin: 0; font-size: 16px; font-weight: 500; flex: 1; }
+.badge { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); background: var(--card); border-radius: 18px; padding: 4px 10px 4px 6px; font-size: 12px; color: var(--muted); }
+.badge .ms { font-size: 16px; }
+.badge.on { color: var(--water); border-color: var(--water); }
+
+.tile { background: var(--card); border: 1px solid var(--line); border-radius: 12px; display: flex; align-items: center; gap: 10px; padding: 10px; min-height: 56px; min-width: 0;
+  font: inherit; color: inherit; text-align: left; cursor: pointer; transition: border-color .15s; }
+.tile:hover { border-color: var(--muted); }
+.tile:focus-visible, .toggle:focus-visible, input[type=range]:focus-visible, .btn:focus-visible, .fab:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.tile .ic { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; flex: none; background: var(--grey-tint); color: var(--muted); }
+.tile .ic .ms { font-size: 20px; }
+.tile .txt { min-width: 0; }
+.tile .name { font-weight: 500; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile .state { font-size: 12px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile.water .ic { background: var(--water-tint); color: var(--water); }
+.tile.amber .ic { background: var(--amber-tint); color: var(--amber); }
+.tile.red .ic { background: var(--red-tint); color: var(--red); }
+.tile.active { border-color: var(--water); }
+
+.card { grid-column: 1 / -1; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 4px 0 8px; min-width: 0; }
+.card h3 { margin: 0; padding: 12px 16px 4px; font-size: 16px; font-weight: 400; }
+.row { display: grid; grid-template-columns: 40px minmax(0, 1fr) minmax(90px, 1.3fr) 52px; align-items: center; gap: 8px; padding: 6px 16px; }
+.row .ms { color: var(--muted); font-size: 22px; }
+.row label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row output { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+input[type=range] { width: 100%; accent-color: var(--primary); margin: 0; }
+
+/* Scheduler card */
+.sched { padding: 0; }
+.sched-head { display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); gap: 12px; }
+.sched-head span { flex: 1; color: var(--muted); font-size: 13px; }
+.sitem { display: grid; grid-template-columns: 40px minmax(0,1fr) auto; gap: 12px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.sitem:last-of-type { border-bottom: 0; }
+.sitem .ms { color: var(--water); }
+.sitem.off .ms, .sitem.off .p, .sitem.off .s { color: var(--muted); }
+.sitem .p { font-weight: 500; line-height: 1.35; }
+.sitem .s { font-size: 13px; color: var(--muted); margin-top: 2px; line-height: 1.35; }
+.toggle { width: 36px; height: 20px; border-radius: 10px; background: var(--track); border: 0; position: relative; cursor: pointer; flex: none; padding: 0; }
+.toggle::after { content: ""; position: absolute; width: 16px; height: 16px; border-radius: 50%; background: var(--card); top: 2px; left: 2px; transition: left .15s; box-shadow: 0 1px 2px rgba(0,0,0,.3); }
+.toggle[aria-checked="true"] { background: var(--primary); }
+.toggle[aria-checked="true"]::after { left: 18px; }
+.sched-foot { display: flex; justify-content: flex-end; padding: 8px 16px 12px; }
+.fab { background: var(--primary); color: #fff; border: 0; border-radius: 16px; display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px 8px 12px; font: 500 14px var(--font); cursor: pointer; }
+
+/* Editor mock */
+.editor { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 16px; padding: 16px; border-top: 1px solid var(--line); }
+@media (max-width: 640px) { .editor { grid-template-columns: 1fr; } }
+.editor h4 { margin: 0 0 8px; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 13px; display: inline-flex; gap: 6px; align-items: center; }
+.chip .ms { font-size: 18px; color: var(--muted); }
+.chip.sel { border-color: var(--primary); color: var(--primary); background: var(--water-tint); }
+.chip.sel .ms { color: var(--primary); }
+.days { display: flex; gap: 6px; flex-wrap: wrap; }
+.day { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); display: grid; place-items: center; font-size: 13px; }
+.day.sel { background: var(--primary); border-color: var(--primary); color: #fff; }
+.timebox { font-size: 28px; font-variant-numeric: tabular-nums; margin-top: 4px; }
+.caption { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+
+/* Confirmation dialog */
+.scrim { position: fixed; inset: 0; background: var(--scrim); display: grid; place-items: center; padding: 16px; z-index: 10; }
+.dialog { background: var(--card); border-radius: 24px; padding: 24px; width: min(360px, 100%); }
+.dialog p { margin: 0 0 6px; font-size: 18px; }
+.dialog .sub { font-size: 14px; color: var(--muted); margin-bottom: 20px; }
+.actions { display: flex; justify-content: flex-end; gap: 8px; }
+.btn { background: none; border: 0; color: var(--primary); font: 500 14px var(--font); padding: 10px 14px; border-radius: 18px; cursor: pointer; }
+.btn.fill { background: var(--primary); color: #fff; }
+/* Now watering panel */
+.section.now { grid-column: 1 / -1; grid-template-columns: 1fr; }
+.nowcard { background: var(--card); border: 1px solid var(--line); border-radius: 12px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; padding: 8px; }
+@media (max-width: 640px) { .nowcard { grid-template-columns: 1fr; } }
+.gauge { display: grid; justify-items: center; align-content: center; padding: 8px 8px 4px; }
+.gauge svg { width: min(220px, 100%); height: auto; display: block; }
+.gauge .arc-bg { stroke: var(--track); }
+.gauge .arc-fg { stroke: var(--water); transition: stroke-dashoffset .4s linear; }
+.gauge .val { fill: var(--fg); font: 400 28px var(--font); }
+.gauge .lbl { font-size: 14px; color: var(--muted); margin-top: 2px; }
+.nowtiles { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; align-content: center; }
+/* Health subtitle, rain delay length, last run table */
+.subhead { grid-column: 1 / -1; font-size: 14px; font-weight: 500; color: var(--muted); padding: 10px 4px 0; }
+.tile.full { grid-column: 1 / -1; }
+.stepper { margin-left: auto; display: flex; align-items: center; gap: 4px; flex: none; }
+.stepper button { width: 32px; height: 32px; border-radius: 50%; border: 0; background: var(--grey-tint); color: var(--fg); cursor: pointer; display: grid; place-items: center; }
+.stepper button .ms { font-size: 18px; }
+.stepper button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.stepper output { min-width: 48px; text-align: center; font-variant-numeric: tabular-nums; }
+.lastrun { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.lastrun th, .lastrun td { padding: 6px 8px; text-align: left; white-space: nowrap; }
+.lastrun th { color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--line); }
+.lastrun th:first-child, .lastrun td:first-child { padding-left: 16px; }
+.lastrun th:last-child, .lastrun td:last-child { padding-right: 16px; }
+.lastrun .num { text-align: right; }
+.lastrun td:first-child { white-space: normal; }
+.card .tablewrap { overflow-x: auto; padding-top: 4px; }
+.tile.ok .ic { background: rgba(67,160,71,.15); color: #43a047; }
+/* Watering plan */
+.section.span2 { grid-column: span 2; grid-template-columns: 1fr; }
+.section.plan { grid-template-columns: 1fr; }
+@media (max-width: 640px) { .section.span2 { grid-column: 1 / -1; } }
+.plan-head { padding: 12px 16px 4px; line-height: 1.4; }
+.plan-head b { font-weight: 500; }
+.plan-foot { padding: 8px 16px 4px; font-size: 13px; color: var(--muted); line-height: 1.45; }
+.olist { list-style: none; margin: 0; padding: 4px 8px 0; }
+.olist li { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto 40px; align-items: center; gap: 8px; padding: 6px 4px 6px 8px;
+  margin: 2px 0; border-radius: 10px; background: var(--card); border: 1px solid transparent; touch-action: pan-y; }
+.olist li.dragging { position: relative; z-index: 1; border-color: var(--primary); box-shadow: 0 4px 12px rgba(0,0,0,.2); }
+.olist .n { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
+.olist .m { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.olist .m.off { font-style: italic; }
+.olist button { width: 40px; height: 40px; border: 0; background: none; color: var(--muted); border-radius: 50%; cursor: grab;
+  touch-action: none; display: grid; place-items: center; padding: 0; }
+.olist button:focus-visible { outline: 2px solid var(--primary); }
+.olist li.dragging button { cursor: grabbing; color: var(--primary); }
+.ohint { padding: 6px 16px 0; font-size: 12px; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="note"><b>Preview with sample data.</b> This mimics Home Assistant's default theme to show the layout of <code>dashboards/home/views/irrigation.yaml</code>. States, times and schedules are made up. Tap a zone or <b>Run all zones</b> to see the Now watering panel (sped up: one minute per 0.1 s). Drag zones in the Order card, change a run time or the budget to see the Watering plan update. Run all follows that order and shows the cycle's progress; try Skip zone while it runs. Tap a rain delay tile to start or cancel one, using the length below it. Drag a slider or flip a schedule to try those too.</div>
+
+<div class="toolbar"><span class="ms">menu</span><span class="title">Home</span><span class="ms">search</span><span class="ms">more_vert</span></div>
+<div class="tabs"><div class="tab"><span class="ms">sprinkler</span>Irrigation</div></div>
+
+<main class="view">
+  <!-- Now watering: only shown while a zone is open -->
+  <section class="section now" id="now" aria-label="Now watering" hidden>
+    <div class="heading"><span class="ms">sprinkler</span><h2>Now watering</h2></div>
+    <div class="nowcard">
+      <div class="gauge">
+        <svg viewBox="0 0 200 116" role="img" aria-label="Watering progress">
+          <path class="arc-bg" d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke-width="22"/>
+          <path class="arc-fg" id="arc" d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke-width="22" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/>
+          <text class="val" id="pct" x="100" y="96" text-anchor="middle">0 %</text>
+        </svg>
+        <div class="lbl">Progress</div>
+      </div>
+      <div class="nowtiles">
+        <div class="tile water"><div class="ic"><span class="ms">sprinkler</span></div><div class="txt"><div class="name">Zone</div><div class="state" id="now-zone">Zone 1</div></div></div>
+        <div class="tile water"><div class="ic"><span class="ms">hourglass</span></div><div class="txt"><div class="name">Zone finishes</div><div class="state" id="now-ends">in 15 minutes</div></div></div>
+        <div class="tile water" id="cyc1" hidden><div class="ic"><span class="ms">format_list_numbered</span></div><div class="txt"><div class="name">Cycle</div><div class="state" id="now-cycle">1 of 7</div></div></div>
+        <div class="tile water" id="cyc2" hidden><div class="ic"><span class="ms">sports_score</span></div><div class="txt"><div class="name">Cycle finishes</div><div class="state" id="now-cycle-ends">in 85 minutes</div></div></div>
+        <button class="tile water" id="now-skip" type="button"><div class="ic"><span class="ms">skip_next</span></div><div class="txt"><div class="name">Skip zone</div><div class="state">Off</div></div></button>
+        <button class="tile red" id="now-stop" type="button"><div class="ic"><span class="ms">format_color_reset</span></div><div class="txt"><div class="name">Stop all</div><div class="state">Off</div></div></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Timers -->
+  <section class="section" aria-label="Timers">
+    <div class="heading"><span class="ms">manage_history</span><h2>Timers</h2></div>
+    <div class="tile water"><div class="ic"><span class="ms">tune</span></div><div class="txt"><div class="name">Timer 1 mode</div><div class="state">Auto</div></div></div>
+    <div class="tile water"><div class="ic"><span class="ms">tune</span></div><div class="txt"><div class="name">Timer 2 mode</div><div class="state">Auto</div></div></div>
+    <button class="tile amber" id="rd1" type="button"><div class="ic"><span class="ms">rainy</span></div><div class="txt"><div class="name">Timer 1 rain delay</div><div class="state">18 h left · Rain</div></div></button>
+    <button class="tile" id="rd2" type="button"><div class="ic"><span class="ms">partly_cloudy_day</span></div><div class="txt"><div class="name">Timer 2 rain delay</div><div class="state">Off</div></div></button>
+    <div class="tile full"><div class="ic"><span class="ms">rainy</span></div><div class="txt"><div class="name">Rain delay length</div><div class="state">Used when you start a delay</div></div>
+      <div class="stepper"><button type="button" id="rdl-minus" aria-label="Shorter"><span class="ms">remove</span></button><output id="rdl">48 h</output><button type="button" id="rdl-plus" aria-label="Longer"><span class="ms">add</span></button></div></div>
+    <div class="tile"><div class="ic"><span class="ms">event</span></div><div class="txt"><div class="name">Timer 1 next run</div><div class="state">Wed 6:00 AM</div></div></div>
+    <div class="tile"><div class="ic"><span class="ms">event</span></div><div class="txt"><div class="name">Timer 2 next run</div><div class="state">Wed 6:00 AM</div></div></div>
+    <button class="tile water" id="runall" type="button"><div class="ic"><span class="ms">water_drop</span></div><div class="txt"><div class="name">Run all zones</div><div class="state" id="runall-state">Off</div></div></button>
+    <button class="tile red" id="stopall" type="button"><div class="ic"><span class="ms">format_color_reset</span></div><div class="txt"><div class="name">Stop all</div><div class="state">Off</div></div></button>
+    <div class="subhead">Health</div>
+    <div class="tile ok"><div class="ic"><span class="ms">check_circle</span></div><div class="txt"><div class="name">Timer 1 faults</div><div class="state">OK</div></div></div>
+    <div class="tile red"><div class="ic"><span class="ms">error</span></div><div class="txt"><div class="name">Timer 2 faults</div><div class="state">Problem</div></div></div>
+    <div class="tile ok"><div class="ic"><span class="ms">router</span></div><div class="txt"><div class="name">Wi-Fi hub</div><div class="state">Connected</div></div></div>
+    <div class="tile"><div class="ic"><span class="ms">battery_5_bar</span></div><div class="txt"><div class="name">Timer 1 battery</div><div class="state">82 %</div></div></div>
+    <div class="tile amber"><div class="ic"><span class="ms">battery_2_bar</span></div><div class="txt"><div class="name">Timer 2 battery</div><div class="state">23 %</div></div></div>
+  </section>
+
+  <!-- Timer 1 and 2 zones are generated below -->
+  <section class="section" id="t1" aria-label="Timer 1 zones"></section>
+  <section class="section" id="t2" aria-label="Timer 2 zones"></section>
+
+  <!-- Watering plan -->
+  <section class="section plan" aria-label="Watering plan">
+    <div class="heading"><span class="ms">timeline</span><h2>Watering plan</h2></div>
+    <div class="tile full"><div class="ic"><span class="ms">percent</span></div><div class="txt"><div class="name">Watering budget (%)</div><div class="state">Scales every run time</div></div>
+      <div class="stepper"><button type="button" id="bud-minus" aria-label="Lower budget"><span class="ms">remove</span></button><output id="bud">100</output><button type="button" id="bud-reset" aria-label="Reset budget to 100"><span class="ms">restart_alt</span></button><button type="button" id="bud-plus" aria-label="Raise budget"><span class="ms">add</span></button></div></div>
+    <div class="card">
+      <div class="plan-head" id="plan-head"></div>
+      <div class="tablewrap"><table class="lastrun">
+        <thead><tr><th class="num">#</th><th>Zone</th><th>Start</th><th>End</th></tr></thead>
+        <tbody id="plan-body"></tbody></table></div>
+      <div class="plan-foot" id="plan-foot"></div>
+    </div>
+    <div class="card"><h3>Order</h3><ol class="olist" id="olist"></ol><div class="ohint">Drag to reorder. Cycles water from the top down.</div></div>
+  </section>
+
+  <!-- Schedules -->
+  <section class="section span2" aria-label="Schedules">
+    <div class="heading"><span class="ms">calendar_clock</span><h2>Schedules</h2></div>
+    <div class="card sched">
+      <div class="sched-head"><span>Schedules</span><button class="toggle" type="button" role="switch" aria-checked="true" aria-label="Enable all schedules" id="all"></button></div>
+      <div id="slist"></div>
+      <div class="sched-foot"><button class="fab" type="button" id="add"><span class="ms">add</span>Add</button></div>
+      <div class="editor" id="editor" hidden>
+        <div>
+          <h4>1 · Pick what to run</h4>
+          <div class="chips">
+            <span class="chip sel"><span class="ms">water_drop</span>Run all zones</span>
+            <span class="chip"><span class="ms">sprinkler</span>Timer 1 – run its zones</span>
+            <span class="chip"><span class="ms">sprinkler</span>Timer 2 – run its zones</span>
+            <span class="chip"><span class="ms">valve</span>Zone 1 … Zone 8</span>
+          </div>
+          <div class="caption">For a single zone, the action is "Water for", with a minutes field. A cycle uses the run times set by the sliders above.</div>
+        </div>
+        <div>
+          <h4>2 · Pick days and time</h4>
+          <div class="days"><span class="day">S</span><span class="day sel">M</span><span class="day">T</span><span class="day sel">W</span><span class="day">T</span><span class="day sel">F</span><span class="day">S</span></div>
+          <div class="timebox">06:00</div>
+          <div class="caption">Time moves in 5-minute steps. You can also use sunrise or sunset.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="scrim" id="dlg" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-q">
+    <p id="dlg-q">Water this zone now?</p>
+    <div class="sub" id="dlg-sub"></div>
+    <div class="actions"><button class="btn" type="button" id="dlg-no">Cancel</button><button class="btn fill" type="button" id="dlg-yes">Confirm</button></div>
+  </div>
+</div>
+
+<script>
+const mins = { 1: 15, 2: 15, 3: 10, 4: 10, 5: 12, 6: 12, 7: 8, 8: 0 };
+let watering = null, timer = null, prog = null;
+// Demo clock: one "minute" of watering passes every 100 ms.
+const DEMO_MIN_MS = 100;
+
+// Watering budget: scales every run time. A zone set above 0 keeps at least 1 minute.
+let budget = 100;
+const eff = n => mins[n] > 0 ? Math.max(1, Math.round(mins[n] * budget / 100)) : 0;
+function setBudget(v) {
+  budget = Math.min(200, Math.max(10, v));
+  document.getElementById("bud").textContent = budget;
+  renderPlan(); renderOrder();
+}
+
+// Position of each zone in a cycle (lowest first, ties by zone number).
+const pos = { 1: 2, 2: 3, 3: 1, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8 };
+const ordered = () => [1,2,3,4,5,6,7,8].sort((a, b) => pos[a] - pos[b] || a - b);
+const PLAN_START = 6 * 60; // the sample schedule: Run all zones, Wed 6:00 AM
+function clock(m) {
+  const t = PLAN_START + m, h = Math.floor(t / 60) % 24, mm = Math.floor(t % 60);
+  return `${(h + 11) % 12 + 1}:${String(mm).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+}
+function renderPlan() {
+  let off = 0, k = 0, rows = "";
+  const skipped = [];
+  for (const n of ordered()) {
+    const m = eff(n);
+    if (m > 0) { k++; rows += `<tr><td class="num">${k}</td><td>Zone ${n}</td><td>${clock(off)}</td><td>${clock(off + m)}</td></tr>`; off += m + 0.5; }
+    else skipped.push("Zone " + n);
+  }
+  const total = Math.floor(off - 0.5);
+  document.getElementById("plan-head").innerHTML = "<b>Run all zones</b>, next Wed 6:00 AM" + (budget !== 100 ? ` · budget ${budget} %` : "");
+  document.getElementById("plan-body").innerHTML = rows;
+  document.getElementById("plan-foot").textContent = k
+    ? `Total ${total >= 60 ? Math.floor(total / 60) + " h " : ""}${total % 60} min, done by ${clock(off - 0.5)}.` + (skipped.length ? ` Skipped (0 min): ${skipped.join(", ")}.` : "")
+    : "Every zone has a run time of 0.";
+}
+
+// Sample history: [started, minutes, gallons]. Zone 8 has never run.
+const lastRun = { 1: ["Mon 6:00 AM", 15, 42.4], 2: ["Mon 6:15 AM", 15, 38.9], 3: ["Mon 6:31 AM", 10, 21.7], 4: ["Mon 6:41 AM", 10, 19.2],
+  5: ["Mon 6:52 AM", 12, 27.5], 6: ["Mon 7:04 AM", 12, 26.1], 7: ["Mon 7:17 AM", 8, null] };
+function zoneSection(t, zones) {
+  const el = document.getElementById("t" + t);
+  el.innerHTML =
+    `<div class="heading"><span class="ms">sprinkler</span><h2>Timer ${t} zones</h2>
+       <span class="badge" id="b${t}"><span class="ms">play_circle</span>Off</span></div>` +
+    zones.map(n => `<button class="tile" type="button" id="z${n}" data-z="${n}">
+        <div class="ic"><span class="ms">valve</span></div>
+        <div class="txt"><div class="name">Zone ${n}</div><div class="state">Closed</div></div></button>`).join("") +
+    `<div class="card"><h3>Run times</h3>` +
+    zones.map(n => `<div class="row"><span class="ms">timer</span><label for="m${n}">Zone ${n} run time</label>
+        <input type="range" id="m${n}" min="0" max="60" step="1" value="${mins[n]}"><output for="m${n}" id="o${n}">${mins[n]} min</output></div>`).join("") +
+    `</div><div class="card"><h3>Last run</h3><div class="tablewrap"><table class="lastrun">
+       <thead><tr><th>Zone</th><th>Started</th><th class="num">Ran</th><th class="num">Water</th></tr></thead><tbody>` +
+    zones.map(n => { const r = lastRun[n];
+      return `<tr><td>Zone ${n}</td><td>${r ? r[0] : "—"}</td><td class="num">${r ? r[1] + " min" : "—"}</td><td class="num">${r && r[2] != null ? r[2].toFixed(1) + " gal" : "—"}</td></tr>`; }).join("") +
+    `</tbody></table></div></div>`;
+}
+zoneSection(1, [1, 2, 3, 4]);
+zoneSection(2, [5, 6, 7, 8]);
+
+// Order card: same behaviour as www/bhyve-zone-order-card.js.
+const olist = document.getElementById("olist");
+function renderOrder() {
+  olist.innerHTML = ordered().map((n, i) => `<li data-z="${n}"><span class="n">${i + 1}</span><span>Zone ${n}</span>
+    <span class="m${eff(n) ? "" : " off"}">${eff(n) ? eff(n) + " min" : "skipped"}</span>
+    <button type="button" aria-label="Move Zone ${n}, position ${i + 1}"><span class="ms">drag_indicator</span></button></li>`).join("");
+}
+function commitOrder() {
+  [...olist.children].forEach((li, i) => {
+    pos[li.dataset.z] = i + 1;
+    li.querySelector(".n").textContent = i + 1;
+    const b = li.querySelector("button");
+    b.setAttribute("aria-label", b.getAttribute("aria-label").replace(/position \d+$/, `position ${i + 1}`));
+  });
+  renderPlan();
+}
+olist.addEventListener("pointerdown", e => {
+  const btn = e.target.closest("button");
+  if (!btn || e.button > 0) return;
+  e.preventDefault();
+  const li = btn.closest("li"), d = { y0: e.clientY };
+  li.classList.add("dragging");
+  // Window listeners keep the drag tracking wherever the pointer goes. Moving the
+  // neighbour (not the dragged row) keeps the dragged row in the DOM.
+  const move = ev => {
+    if (ev.pointerId !== e.pointerId) return;
+    const dy0 = ev.clientY - d.y0, prev = li.previousElementSibling, next = li.nextElementSibling, top = li.offsetTop;
+    if (next && dy0 > next.offsetHeight / 2) li.before(next);
+    else if (prev && dy0 < -prev.offsetHeight / 2) li.after(prev);
+    if (li.offsetTop !== top) { d.y0 += li.offsetTop - top; commitOrder(); }
+    // Keep the row between the first and last slots of the list.
+    const min = olist.firstElementChild.offsetTop - li.offsetTop, max = olist.lastElementChild.offsetTop - li.offsetTop;
+    li.style.transform = `translateY(${Math.min(max, Math.max(min, ev.clientY - d.y0))}px)`;
+  };
+  const end = ev => {
+    if (ev.pointerId !== e.pointerId) return;
+    window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", end); window.removeEventListener("pointercancel", end);
+    li.classList.remove("dragging"); li.style.transform = "";
+  };
+  window.addEventListener("pointermove", move); window.addEventListener("pointerup", end); window.addEventListener("pointercancel", end);
+});
+olist.addEventListener("keydown", e => {
+  const btn = e.target.closest("button");
+  if (!btn || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
+  e.preventDefault();
+  const li = btn.closest("li");
+  if (e.key === "ArrowUp" && li.previousElementSibling) li.after(li.previousElementSibling);
+  else if (e.key === "ArrowDown" && li.nextElementSibling) li.before(li.nextElementSibling);
+  else return;
+  btn.focus(); commitOrder();
+});
+renderOrder();
+for (let n = 1; n <= 8; n++) {
+  const r = document.getElementById("m" + n);
+  r.addEventListener("input", () => { mins[n] = +r.value; document.getElementById("o" + n).textContent = r.value + " min"; renderPlan(); renderOrder(); });
+  document.getElementById("z" + n).addEventListener("click", () => ask(n));
+}
+
+// Demo engine. A cycle is { zones, i, endsAt }; a single zone has cycle = null.
+let cycle = null;
+
+function setZone(n) {
+  for (let i = 1; i <= 8; i++) {
+    const t = document.getElementById("z" + i), on = i === n;
+    t.classList.toggle("water", on); t.classList.toggle("active", on);
+    t.querySelector(".state").textContent = on ? `Open · ${eff(i)} min` : "Closed";
+  }
+  watering = n;
+  showNow(n);
+}
+
+function showNow(n) {
+  clearInterval(prog);
+  // Stay up between zones while a cycle runs.
+  document.getElementById("now").hidden = !n && !cycle;
+  document.getElementById("cyc1").hidden = document.getElementById("cyc2").hidden = !cycle;
+  if (cycle) document.getElementById("now-cycle").textContent = `${cycle.i + 1} of ${cycle.zones.length}`;
+  if (!n) {
+    // Between zones in a cycle, the zone sensors read Idle in HA too.
+    document.getElementById("now-zone").textContent = "Idle";
+    document.getElementById("now-ends").textContent = "Unknown";
+    document.getElementById("arc").setAttribute("stroke-dashoffset", 100);
+    document.getElementById("pct").textContent = "0 %";
+    return;
+  }
+  const total = eff(n), t0 = Date.now();
+  document.getElementById("now-zone").textContent = "Zone " + n;
+  const mins_ = m => `in ${m} minute${m === 1 ? "" : "s"}`;
+  const tick = () => {
+    const done = Math.min(total, (Date.now() - t0) / DEMO_MIN_MS), pct = Math.round(done / total * 100);
+    document.getElementById("arc").setAttribute("stroke-dashoffset", 100 - pct);
+    document.getElementById("pct").textContent = pct + " %";
+    const left = Math.ceil(total - done);
+    document.getElementById("now-ends").textContent = left > 0 ? mins_(left) : "now";
+    if (cycle) {
+      const cl = Math.ceil((cycle.endsAt - Date.now()) / DEMO_MIN_MS);
+      document.getElementById("now-cycle-ends").textContent = cl > 0 ? mins_(cl) : "now";
+    }
+    if (done >= total) { clearInterval(prog); if (!cycle) setZone(null); }
+  };
+  tick(); prog = setInterval(tick, 100);
+}
+
+function startZone() {
+  const left = cycle.zones.slice(cycle.i);
+  cycle.endsAt = Date.now() + (left.reduce((a, z) => a + eff(z), 0) + 0.5 * left.length) * DEMO_MIN_MS;
+  const z = cycle.zones[cycle.i];
+  setZone(z); setRunning(z);
+  timer = setTimeout(nextZone, eff(z) * DEMO_MIN_MS + 300);
+}
+function nextZone() {
+  cycle.i++;
+  if (cycle.i >= cycle.zones.length) { stopAll(); return; }
+  startZone();
+}
+// Skip: in a cycle, close this zone and start the next shortly; otherwise just stop.
+function skipZone() {
+  if (!cycle) { stopAll(); return; }
+  clearTimeout(timer);
+  setZone(null);
+  timer = setTimeout(nextZone, 400);
+}
+
+let pending = null;
+function ask(n) {
+  pending = n;
+  document.getElementById("dlg-q").textContent = n === "all" ? "Start watering all zones?" : "Water this zone now?";
+  document.getElementById("dlg-sub").textContent = n === "all"
+    ? "Zones run one at a time, in the set order, using their run times."
+    : eff(n) > 0 ? `Zone ${n} runs for ${eff(n)} minutes.` : `Zone ${n} has a run time of 0, so it will be skipped.`;
+  document.getElementById("dlg").hidden = false;
+  document.getElementById("dlg-yes").focus();
+}
+document.getElementById("dlg-no").onclick = () => { document.getElementById("dlg").hidden = true; };
+document.getElementById("dlg-yes").onclick = () => {
+  document.getElementById("dlg").hidden = true;
+  clearTimeout(timer);
+  if (pending === "all") {
+    const zones = ordered().filter(i => eff(i) > 0);
+    if (!zones.length) return;
+    cycle = { zones, i: 0 };
+    startZone();
+  } else if (eff(pending) > 0) { cycle = null; setZone(pending); setRunning(null); }
+};
+function setRunning(z) {
+  document.getElementById("runall-state").textContent = z ? `On · Zone ${z}` : "Off";
+  document.getElementById("runall").classList.toggle("active", !!z);
+  for (const t of [1, 2]) {
+    const b = document.getElementById("b" + t), on = z && (t === 1 ? z <= 4 : z > 4);
+    b.classList.toggle("on", !!on);
+    b.lastChild.textContent = on ? "On" : "Off";
+  }
+}
+function stopAll() { clearTimeout(timer); cycle = null; setZone(null); setRunning(null); }
+document.getElementById("runall").onclick = () => ask("all");
+document.getElementById("stopall").onclick = stopAll;
+document.getElementById("now-stop").onclick = stopAll;
+document.getElementById("now-skip").onclick = skipZone;
+document.getElementById("bud-minus").onclick = () => setBudget(budget - 10);
+document.getElementById("bud-plus").onclick = () => setBudget(budget + 10);
+document.getElementById("bud-reset").onclick = () => setBudget(100);
+document.addEventListener("keydown", e => { if (e.key === "Escape") document.getElementById("dlg").hidden = true; });
+
+let rdHours = 48;
+const rdl = document.getElementById("rdl");
+document.getElementById("rdl-minus").onclick = () => { rdHours = Math.max(24, rdHours - 24); rdl.textContent = rdHours + " h"; };
+document.getElementById("rdl-plus").onclick = () => { rdHours = Math.min(168, rdHours + 24); rdl.textContent = rdHours + " h"; };
+for (const id of ["rd1", "rd2"]) {
+  const t = document.getElementById(id);
+  t.onclick = () => {
+    const on = !t.classList.contains("amber");
+    t.classList.toggle("amber", on);
+    t.querySelector(".ic .ms").textContent = on ? "rainy" : "partly_cloudy_day";
+    t.querySelector(".state").textContent = on ? `${rdHours} h left` : "Off";
+  };
+}
+
+const schedules = [
+  { icon: "water_drop", what: "Run all zones", act: "Turn on", when: "Every Mon, Wed and Fri at 6:00 AM", next: "Wed 6:00 AM", on: true },
+  { icon: "valve", what: "Zone 3", act: "Water for 10 min", when: "Every day at 7:30 PM", next: "today 7:30 PM", on: false },
+];
+function renderSchedules() {
+  document.getElementById("slist").innerHTML = schedules.map((s, i) => `
+    <div class="sitem${s.on ? "" : " off"}">
+      <span class="ms">${s.icon}</span>
+      <div><div class="p">${s.what}: ${s.act}</div>
+        <div class="s">${s.when} · ${s.on ? "next " + s.next : "disabled"}</div></div>
+      <button class="toggle" type="button" role="switch" aria-checked="${s.on}" aria-label="Enable ${s.what} schedule" data-i="${i}"></button>
+    </div>`).join("");
+  document.querySelectorAll("#slist .toggle").forEach(b => b.onclick = () => { schedules[b.dataset.i].on = !schedules[b.dataset.i].on; renderSchedules(); });
+}
+renderSchedules();
+renderPlan();
+document.getElementById("all").onclick = e => {
+  const v = e.currentTarget.getAttribute("aria-checked") !== "true";
+  e.currentTarget.setAttribute("aria-checked", v); schedules.forEach(s => s.on = v); renderSchedules();
+};
+document.getElementById("add").onclick = () => { const ed = document.getElementById("editor"); ed.hidden = !ed.hidden; };
+</script>
+</body>
+</html>

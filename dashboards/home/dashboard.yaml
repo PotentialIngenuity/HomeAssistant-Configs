@@ -1,0 +1,4 @@
+# Home dashboard. Each view lives in its own file under views/.
+title: Home
+views:
+  - !include views/irrigation.yaml

@@ -1,0 +1,475 @@
+# Irrigation view: B-hyve status, quick controls, run times, and schedules.
+# Entities come from packages/irrigation.yaml and the B-hyve integration.
+title: Irrigation
+path: irrigation
+icon: mdi:sprinkler-variant
+type: sections
+max_columns: 3
+sections:
+  # Now watering: shown while a zone is open or a cycle is running (so it stays
+  # up between zones). The sensors come from the template blocks in
+  # packages/irrigation.yaml.
+  - type: grid
+    column_span: 3
+    visibility:
+      - condition: or
+        conditions:
+          - condition: state
+            entity: sensor.watering_zone
+            state_not: Idle
+          - condition: state
+            entity: sensor.watering_cycle
+            state_not: Idle
+    cards:
+      - type: heading
+        heading: Now watering
+        icon: mdi:sprinkler-variant
+      - type: horizontal-stack
+        grid_options:
+          columns: full
+        cards:
+          - type: gauge
+            entity: sensor.watering_progress
+            name: Progress
+            min: 0
+            max: 100
+            segments:
+              - from: 0
+                color: "#2b8be8"
+          - type: vertical-stack
+            cards:
+              - type: horizontal-stack
+                cards:
+                  - type: tile
+                    entity: sensor.watering_zone
+                    name: Zone
+                    color: blue
+                    tap_action:
+                      action: none
+                  - type: tile
+                    entity: sensor.watering_ends
+                    name: Zone finishes
+                    color: blue
+              # Only during a cycle: "3 of 6" and when the last zone finishes.
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: sensor.watering_cycle
+                    state_not: Idle
+                card:
+                  type: horizontal-stack
+                  cards:
+                    - type: tile
+                      entity: sensor.watering_cycle
+                      name: Cycle
+                      color: blue
+                      tap_action:
+                        action: none
+                    - type: tile
+                      entity: sensor.watering_cycle_ends
+                      name: Cycle finishes
+                      color: blue
+              - type: horizontal-stack
+                cards:
+                  - type: tile
+                    entity: script.bhyve_skip_zone
+                    name: Skip zone
+                    icon: mdi:skip-next
+                    color: blue
+                    tap_action:
+                      action: perform-action
+                      perform_action: script.bhyve_skip_zone
+                  - type: tile
+                    entity: script.bhyve_stop_all
+                    name: Stop all
+                    icon: mdi:water-off
+                    color: red
+                    tap_action:
+                      action: perform-action
+                      perform_action: script.bhyve_stop_all
+
+  - type: grid
+    cards:
+      - type: heading
+        heading: Timers
+        icon: mdi:timer-cog-outline
+      - type: tile
+        entity: select.bhyve_timer_1_mode
+        name: Timer 1 mode
+      - type: tile
+        entity: select.bhyve_timer_2_mode
+        name: Timer 2 mode
+      # Rain delay: shows time left and why. Tap starts a delay of the length
+      # below, or cancels the one running.
+      - type: tile
+        entity: sensor.timer_1_rain_delay_status
+        name: Timer 1 rain delay
+        tap_action:
+          action: perform-action
+          perform_action: script.bhyve_toggle_rain_delay
+          data:
+            rain_delay: switch.bhyve_timer_1_rain_delay
+          confirmation:
+            text: Start or cancel the Timer 1 rain delay?
+      - type: tile
+        entity: sensor.timer_2_rain_delay_status
+        name: Timer 2 rain delay
+        tap_action:
+          action: perform-action
+          perform_action: script.bhyve_toggle_rain_delay
+          data:
+            rain_delay: switch.bhyve_timer_2_rain_delay
+          confirmation:
+            text: Start or cancel the Timer 2 rain delay?
+      - type: tile
+        entity: input_number.bhyve_rain_delay_hours
+        name: Rain delay length
+        grid_options:
+          columns: full
+        features:
+          - type: numeric-input
+            style: buttons
+      - type: tile
+        entity: sensor.bhyve_timer_1_next_watering
+        name: Timer 1 next run
+      - type: tile
+        entity: sensor.bhyve_timer_2_next_watering
+        name: Timer 2 next run
+      - type: tile
+        entity: script.bhyve_run_all
+        name: Run all zones
+        icon: mdi:water
+        tap_action:
+          action: perform-action
+          perform_action: script.bhyve_run_all
+          confirmation:
+            text: Start watering all zones?
+      - type: tile
+        entity: script.bhyve_stop_all
+        name: Stop all
+        icon: mdi:water-off
+        color: red
+        tap_action:
+          action: perform-action
+          perform_action: script.bhyve_stop_all
+
+      # Health. The hub and battery tiles hide themselves if your setup
+      # doesn't have those entities (no Wi-Fi hub, or mains-powered timers).
+      - type: heading
+        heading: Health
+        heading_style: subtitle
+      - type: tile
+        entity: binary_sensor.bhyve_timer_1_fault
+        name: Timer 1 faults
+      - type: tile
+        entity: binary_sensor.bhyve_timer_2_fault
+        name: Timer 2 faults
+      - type: tile
+        entity: binary_sensor.bhyve_hub_connected
+        name: Wi-Fi hub
+        visibility:
+          - condition: state
+            entity: binary_sensor.bhyve_hub_connected
+            state_not: unavailable
+      - type: tile
+        entity: sensor.bhyve_timer_1_battery
+        name: Timer 1 battery
+        visibility:
+          - condition: state
+            entity: sensor.bhyve_timer_1_battery
+            state_not: unavailable
+      - type: tile
+        entity: sensor.bhyve_timer_2_battery
+        name: Timer 2 battery
+        visibility:
+          - condition: state
+            entity: sensor.bhyve_timer_2_battery
+            state_not: unavailable
+
+  - type: grid
+    cards:
+      - type: heading
+        heading: Timer 1 zones
+        icon: mdi:sprinkler
+        badges:
+          - type: entity
+            entity: script.bhyve_timer_1_cycle
+            show_state: true
+      - type: tile
+        entity: valve.bhyve_zone_1
+        # Tap: water for the configured run time. Hold: details.
+        tap_action:
+          action: perform-action
+          perform_action: script.bhyve_water_zone
+          data:
+            zone: valve.bhyve_zone_1
+          confirmation:
+            text: Water this zone now?
+        hold_action:
+          action: more-info
+      - type: tile
+        entity: valve.bhyve_zone_2
+        # Tap: water for the configured run time. Hold: details.
+        tap_action:
+          action: perform-action
+          perform_action: script.bhyve_water_zone
+          data:
+            zone: valve.bhyve_zone_2
+          confirmation:
+            text: Water this zone now?
+        hold_action:
+          action: more-info
+      - type: tile
+        entity: valve.bhyve_zone_3
+        # Tap: water for the configured run time. Hold: details.
+        tap_action:
+          action: perform-action
+          perform_action: script.bhyve_water_zone
+          data:
+            zone: valve.bhyve_zone_3
+          confirmation:
+            text: Water this zone now?
+        hold_action:
+          action: more-info
+      - type: tile
+        entity: valve.bhyve_zone_4
+        # Tap: water for the configured run time. Hold: details.
+        tap_action:
+          action: perform-action
+          perform_action: script.bhyve_water_zone
+          data:
+            zone: valve.bhyve_zone_4
+          confirmation:
+            text: Water this zone now?
+        hold_action:
+          action: more-info
+      - type: entities
+        title: Run times
+        show_header_toggle: false
+        entities:
+          - input_number.bhyve_zone_1_minutes
+          - input_number.bhyve_zone_2_minutes
+          - input_number.bhyve_zone_3_minutes
+          - input_number.bhyve_zone_4_minutes
+      # Last run per zone, from the B-hyve zone history sensors.
+      - type: markdown
+        title: Last run
+        content: |-
+          | Zone | Started | Ran | Water |
+          |:--|:--|--:|--:|
+          {%- for n in range(1, 5) %}
+          {%- set h = 'sensor.bhyve_zone_' ~ n ~ '_history' %}
+          {%- set t = as_datetime(states(h), none) %}
+          {%- set gal = state_attr(h, 'consumption_gallons') %}
+          {%- set name = state_attr('valve.bhyve_zone_' ~ n, 'friendly_name') or 'Zone ' ~ n %}
+          {%- set started = as_local(t).strftime('%a %-I:%M %p') if t else '—' %}
+          {%- set ran = (state_attr(h, 'run_time') | float(0) | round(0) | int) ~ ' min' if t else '—' %}
+          {%- set water = (gal | float(0) | round(1)) ~ ' gal' if gal is not none else '—' %}
+          | {{ name }} | {{ started }} | {{ ran }} | {{ water }} |
+          {%- endfor %}
+
+  - type: grid
+    cards:
+      - type: heading
+        heading: Timer 2 zones
+        icon: mdi:sprinkler
+        badges:
+          - type: entity
+            entity: script.bhyve_timer_2_cycle
+            show_state: true
+      - type: tile
+        entity: valve.bhyve_zone_5
+        # Tap: water for the configured run time. Hold: details.
+        tap_action:
+          action: perform-action
+          perform_action: script.bhyve_water_zone
+          data:
+            zone: valve.bhyve_zone_5
+          confirmation:
+            text: Water this zone now?
+        hold_action:
+          action: more-info
+      - type: tile
+        entity: valve.bhyve_zone_6
+        # Tap: water for the configured run time. Hold: details.
+        tap_action:
+          action: perform-action
+          perform_action: script.bhyve_water_zone
+          data:
+            zone: valve.bhyve_zone_6
+          confirmation:
+            text: Water this zone now?
+        hold_action:
+          action: more-info
+      - type: tile
+        entity: valve.bhyve_zone_7
+        # Tap: water for the configured run time. Hold: details.
+        tap_action:
+          action: perform-action
+          perform_action: script.bhyve_water_zone
+          data:
+            zone: valve.bhyve_zone_7
+          confirmation:
+            text: Water this zone now?
+        hold_action:
+          action: more-info
+      - type: tile
+        entity: valve.bhyve_zone_8
+        # Tap: water for the configured run time. Hold: details.
+        tap_action:
+          action: perform-action
+          perform_action: script.bhyve_water_zone
+          data:
+            zone: valve.bhyve_zone_8
+          confirmation:
+            text: Water this zone now?
+        hold_action:
+          action: more-info
+      - type: entities
+        title: Run times
+        show_header_toggle: false
+        entities:
+          - input_number.bhyve_zone_5_minutes
+          - input_number.bhyve_zone_6_minutes
+          - input_number.bhyve_zone_7_minutes
+          - input_number.bhyve_zone_8_minutes
+      # Last run per zone, from the B-hyve zone history sensors.
+      - type: markdown
+        title: Last run
+        content: |-
+          | Zone | Started | Ran | Water |
+          |:--|:--|--:|--:|
+          {%- for n in range(5, 9) %}
+          {%- set h = 'sensor.bhyve_zone_' ~ n ~ '_history' %}
+          {%- set t = as_datetime(states(h), none) %}
+          {%- set gal = state_attr(h, 'consumption_gallons') %}
+          {%- set name = state_attr('valve.bhyve_zone_' ~ n, 'friendly_name') or 'Zone ' ~ n %}
+          {%- set started = as_local(t).strftime('%a %-I:%M %p') if t else '—' %}
+          {%- set ran = (state_attr(h, 'run_time') | float(0) | round(0) | int) ~ ' min' if t else '—' %}
+          {%- set water = (gal | float(0) | round(1)) ~ ' gal' if gal is not none else '—' %}
+          | {{ name }} | {{ started }} | {{ ran }} | {{ water }} |
+          {%- endfor %}
+
+  # Watering plan: when each zone will run in the next scheduled cycle,
+  # worked out from the order, the run times and the schedule's start time.
+  - type: grid
+    cards:
+      - type: heading
+        heading: Watering plan
+        icon: mdi:timeline-clock-outline
+      # Scales every zone's run time. Reset goes back to 100 %.
+      - type: tile
+        entity: counter.bhyve_watering_budget
+        name: Watering budget (%)
+        grid_options:
+          columns: full
+        features:
+          - type: counter-actions
+            actions:
+              - decrement
+              - reset
+              - increment
+      - type: markdown
+        content: |-
+          {%- set cycles = {'script.bhyve_run_all': [1, 2, 3, 4, 5, 6, 7, 8],
+                            'script.bhyve_timer_1_cycle': [1, 2, 3, 4],
+                            'script.bhyve_timer_2_cycle': [5, 6, 7, 8]} %}
+          {#- The next enabled schedule that runs one of the cycles. #}
+          {%- set nx = namespace(t=none, c='script.bhyve_run_all') %}
+          {%- for sw in states.switch if sw.attributes.next_trigger is defined and sw.state not in ['off', 'completed'] %}
+          {%- set hit = (sw.attributes.entities or []) | select('in', cycles) | list %}
+          {%- set t = as_datetime(sw.attributes.next_trigger | string, none) %}
+          {%- if hit and t and (nx.t is none or t < nx.t) %}{% set nx.t = t %}{% set nx.c = hit[0] %}{% endif %}
+          {%- endfor %}
+          {%- macro at(mins) -%}
+          {%- if nx.t -%}{{ as_local(nx.t + timedelta(minutes=mins)).strftime('%-I:%M %p') }}
+          {%- else -%}+{{ (mins // 60) | int }}:{{ '%02d' | format((mins % 60) | int) }}{%- endif -%}
+          {%- endmacro %}
+          **{{ state_attr(nx.c, 'friendly_name') or 'Run all zones' }}**
+          {{- ', next ' ~ as_local(nx.t).strftime('%a %-I:%M %p') if nx.t else ' (not scheduled; times from start)' }}
+          {%- set budget = states('counter.bhyve_watering_budget') | int(100) %}
+          {{- ' · budget ' ~ budget ~ ' %' if budget != 100 }}
+
+          | # | Zone | Start | End |
+          |--:|:--|:--|:--|
+          {%- set p = namespace(off=0, k=0, skipped=[]) %}
+          {%- for v in state_attr('sensor.watering_order', 'zones') or [] if (v.split('_') | last | int) in cycles[nx.c] %}
+          {%- set m = (state_attr('sensor.watering_order', 'minutes') or {}).get(v, 0) | int(0) %}
+          {%- set name = state_attr(v, 'friendly_name') or v %}
+          {%- if m > 0 %}
+          {%- set p.k = p.k + 1 %}
+          | {{ p.k }} | {{ name }} | {{ at(p.off) }} | {{ at(p.off + m) }} |
+          {%- set p.off = p.off + m + 0.5 %}
+          {%- else %}{% set p.skipped = p.skipped + [name] %}{% endif %}
+          {%- endfor %}
+          {%- set total = (p.off - 0.5) | int %}
+
+          {% if p.k %}Total {{ (total // 60 ~ ' h ' if total >= 60 else '') ~ total % 60 ~ ' min' }}{{ ', done by ' ~ at(p.off - 0.5) if nx.t }}.{% else %}Every zone has a run time of 0.{% endif %}
+          {%- if p.skipped %} Skipped (0 min): {{ p.skipped | join(', ') }}.{% endif %}
+          {%- for n in [1, 2] if is_state('switch.bhyve_timer_' ~ n ~ '_rain_delay', 'on') and (cycles[nx.c] | select('in', [n * 4 - 3, n * 4 - 2, n * 4 - 1, n * 4]) | list) %}
+          Timer {{ n }} has a rain delay on; its zones are skipped while it lasts.
+          {%- endfor %}
+      # Drag to reorder. The card lives in www/bhyve-zone-order-card.js and
+      # writes to input_number.bhyve_zone_N_order.
+      - type: custom:bhyve-zone-order-card
+        title: Order
+        zones:
+          - valve.bhyve_zone_1
+          - valve.bhyve_zone_2
+          - valve.bhyve_zone_3
+          - valve.bhyve_zone_4
+          - valve.bhyve_zone_5
+          - valve.bhyve_zone_6
+          - valve.bhyve_zone_7
+          - valve.bhyve_zone_8
+
+  # Schedules. Pick a timer cycle (runs its 4 zones back to back using the
+  # run times above), or a single zone with its own minute count.
+  - type: grid
+    column_span: 2
+    cards:
+      - type: heading
+        heading: Schedules
+        icon: mdi:calendar-clock
+      - type: custom:scheduler-card
+        grid_options:
+          columns: full
+        title: false
+        discover_existing: false
+        time_step: 5
+        show_header_toggle: true
+        include:
+          - script.bhyve_timer_1_cycle
+          - script.bhyve_timer_2_cycle
+          - script.bhyve_run_all
+          - valve.bhyve_zone_1
+          - valve.bhyve_zone_2
+          - valve.bhyve_zone_3
+          - valve.bhyve_zone_4
+          - valve.bhyve_zone_5
+          - valve.bhyve_zone_6
+          - valve.bhyve_zone_7
+          - valve.bhyve_zone_8
+        customize:
+          valve.bhyve_zone_1: &water_for
+            actions:
+              - service: bhyve.start_watering
+                name: Water for
+                icon: mdi:sprinkler
+                variables:
+                  minutes:
+                    name: Minutes
+                    unit: min
+                    min: 1
+                    max: 60
+                    step: 1
+              - service: bhyve.stop_watering
+                name: Stop watering
+                icon: mdi:water-off
+          valve.bhyve_zone_2: *water_for
+          valve.bhyve_zone_3: *water_for
+          valve.bhyve_zone_4: *water_for
+          valve.bhyve_zone_5: *water_for
+          valve.bhyve_zone_6: *water_for
+          valve.bhyve_zone_7: *water_for
+          valve.bhyve_zone_8: *water_for
