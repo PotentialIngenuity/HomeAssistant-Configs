@@ -19,9 +19,10 @@ dashboards/home/views/<page>.yaml    the page itself
 www/<card>.js                        custom cards a page needs (served at /local/<card>.js)
 docs/<page>.md                       what the page does, its setup, entity IDs, troubleshooting
 preview/<page>-preview.html, .png    optional standalone mock of the page and a screenshot
+tools/                               utility scripts you run from your computer
 ```
 
-`docs/` and `preview/` are documentation only; they don't need to be copied to Home Assistant.
+`docs/`, `preview/` and `tools/` aren't copied to Home Assistant.
 
 ## Setup
 
@@ -61,6 +62,25 @@ Cards in `www/` are registered once as dashboard resources:
 |---|---|
 | `bhyve-zone-order-card.js` | Irrigation |
 
+## Utility scripts
+
+These run on your computer with [uv](https://docs.astral.sh/uv/) (`brew install uv`), which sets up Python and each script's dependencies from the header at the top of the script. They talk to Home Assistant over its API. They need a long-lived access token: your profile → Security → Long-lived access tokens. Put it in `HA_TOKEN` without it landing in your shell history:
+
+```sh
+read -s "HA_TOKEN?Token: "; export HA_TOKEN    # zsh; in bash: read -s -p "Token: " HA_TOKEN; export HA_TOKEN
+```
+
+| Script | What it does |
+|---|---|
+| `tools/rename_entities.py` | Renames entities from a map file, so a page's entity IDs match without editing each one in the UI. Dry run by default; add `--apply` to make the changes. Safe to run again. |
+
+```sh
+tools/rename_entities.py tools/irrigation-renames.json --url http://homeassistant.local:8123           # dry run
+tools/rename_entities.py tools/irrigation-renames.json --url http://homeassistant.local:8123 --apply   # do it
+```
+
+A map file is a JSON list of `{"from": "<current ID>", "to": "<new ID>", "name": "<optional display name>"}`. The dry run marks each line `rename`, `done` (already renamed), `MISSING` (neither ID exists) or `CONFLICT` (both exist; sort that one out by hand). IDs can be swapped or rotated between entities in the same map, e.g. to renumber zones; those lines are marked `(swap)`.
+
 ## Updating
 
 | You changed | Then |
@@ -75,6 +95,7 @@ Cards in `www/` are registered once as dashboard resources:
 2. `packages/lighting.yaml`: the page's helpers, scripts and template sensors. Prefix entity IDs with the page or device name so pages don't collide.
 3. `dashboards/home/views/lighting.yaml`: the view (`title`, `path`, `icon`, `type: sections`), then add `- !include views/lighting.yaml` to `dashboards/home/dashboard.yaml`.
 4. Any custom card goes in `www/`; add it to the [Custom cards](#custom-cards) table.
-5. `docs/lighting.md`: what it does, requirements, setup, entity IDs, how it works, troubleshooting. [docs/irrigation.md](docs/irrigation.md) is a good model.
-6. Optionally, `preview/lighting-preview.html` and a screenshot for the doc.
-7. Add a row to the [Pages](#pages) table.
+5. If the page needs devices renamed to fixed IDs, optionally add `tools/lighting-renames.json` for [`rename_entities.py`](#utility-scripts).
+6. `docs/lighting.md`: what it does, requirements, setup, entity IDs, how it works, troubleshooting. [docs/irrigation.md](docs/irrigation.md) is a good model.
+7. Optionally, `preview/lighting-preview.html` and a screenshot for the doc.
+8. Add a row to the [Pages](#pages) table.

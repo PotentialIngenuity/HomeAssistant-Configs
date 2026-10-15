@@ -27,7 +27,7 @@ An Irrigation dashboard and the scripts behind it for two 4-zone B-hyve timers (
 ## Setup
 
 1. **Copy the files** listed above into `/config`, keeping their paths.
-2. **Rename your B-hyve entities** to the IDs in [Entity IDs](#entity-ids) below. Then the files need no edits.
+2. **Rename your B-hyve entities** to the IDs in [Entity IDs](#entity-ids) below. Then the files need no edits. `tools/irrigation-renames.json` does this for my devices with [`rename_entities.py`](../README.md#utility-scripts); for yours, change its `from` IDs (and zone names) first.
 3. **Restart Home Assistant.**
 4. **Register the Order card** as a dashboard resource (once): URL `/local/bhyve-zone-order-card.js`, type **JavaScript module**. See [Custom cards](../README.md#custom-cards) for where.
 5. **Set it up on the page:**
