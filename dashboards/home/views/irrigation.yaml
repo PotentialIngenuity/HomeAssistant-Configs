@@ -8,7 +8,8 @@ max_columns: 3
 sections:
   # Now watering: shown while a zone is open or a cycle is running (so it stays
   # up between zones). The sensors come from the template blocks in
-  # packages/irrigation.yaml.
+  # packages/irrigation.yaml. Unknown/unavailable (e.g. right after a reload)
+  # count as idle.
   - type: grid
     column_span: 3
     visibility:
@@ -16,10 +17,10 @@ sections:
         conditions:
           - condition: state
             entity: sensor.watering_zone
-            state_not: Idle
+            state_not: [Idle, unknown, unavailable]
           - condition: state
             entity: sensor.watering_cycle
-            state_not: Idle
+            state_not: [Idle, unknown, unavailable]
     cards:
       - type: heading
         heading: Now watering

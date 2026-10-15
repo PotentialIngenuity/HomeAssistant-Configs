@@ -568,7 +568,7 @@ template:
 
   # The cycle in progress: "3 of 6" and when the whole cycle should finish.
   # Set by the bhyve_cycle event from script.bhyve_run_zones; cleared when that
-  # script stops (finished, or Stop all) and on restart.
+  # script stops (finished, or Stop all), on restart and when templates reload.
   - triggers:
       - trigger: event
         event_type: bhyve_cycle
@@ -578,6 +578,8 @@ template:
         to: "off"
       - trigger: homeassistant
         event: start
+      - trigger: event
+        event_type: event_template_reloaded
     sensor:
       - name: Watering cycle
         unique_id: bhyve_watering_cycle
