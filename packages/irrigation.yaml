@@ -414,19 +414,6 @@ template:
           {{ (as_datetime(start) + timedelta(minutes=mins)).isoformat()
              if start and mins > 0 else none }}
 
-      # Updates once a minute while a zone is open.
-      - name: Watering progress
-        unique_id: bhyve_watering_progress
-        unit_of_measurement: "%"
-        icon: mdi:progress-clock
-        state: >-
-          {% set start = state_attr('sensor.watering_zone', 'started') %}
-          {% set mins = state_attr('sensor.watering_zone', 'run_minutes') | float(0) %}
-          {% if start and mins > 0 %}
-            {{ ([0, (now() - as_datetime(start)).total_seconds() / (mins * 60) * 100, 100]
-                | sort)[1] | round(0) }}
-          {% else %}0{% endif %}
-
       # Every zone, sorted by its order helper (zones attribute), and each
       # zone's run time scaled by the budget (minutes attribute). Cycles, the
       # Watering plan card and the Order card read them from here.
@@ -565,6 +552,35 @@ template:
             {{ as_local(nx.t).strftime('%a %-I:%M %p') }}
             {{- ' · rain delay' if is_state(rd, 'on') and (rd_end is none or rd_end > nx.t) }}
           {% else %}Not scheduled{% endif %}
+
+  # Progress of the zone watering now. A now() template only updates once a
+  # minute, so this recalculates every 5 seconds while a zone is open, and right
+  # away when the zone changes. While idle, the 5-second trigger is skipped.
+  - triggers:
+      - trigger: time_pattern
+        seconds: "/5"
+      - trigger: state
+        entity_id: sensor.watering_zone
+      - trigger: homeassistant
+        event: start
+      - trigger: event
+        event_type: event_template_reloaded
+    conditions:
+      - condition: template
+        value_template: >-
+          {{ trigger.platform != 'time_pattern' or not is_state('sensor.watering_zone', 'Idle') }}
+    sensor:
+      - name: Watering progress
+        unique_id: bhyve_watering_progress
+        unit_of_measurement: "%"
+        icon: mdi:progress-clock
+        state: >-
+          {% set start = state_attr('sensor.watering_zone', 'started') %}
+          {% set mins = state_attr('sensor.watering_zone', 'run_minutes') | float(0) %}
+          {% if start and mins > 0 %}
+            {{ ([0, (now() - as_datetime(start)).total_seconds() / (mins * 60) * 100, 100]
+                | sort)[1] | round(0) }}
+          {% else %}0{% endif %}
 
   # The cycle in progress: "3 of 6" and when the whole cycle should finish.
   # Set by the bhyve_cycle event from script.bhyve_run_zones; cleared when that

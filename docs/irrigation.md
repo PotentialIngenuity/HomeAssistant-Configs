@@ -78,7 +78,7 @@ The scripts find a zone's helpers from its valve's ID (`valve.bhyve_zone_3` → 
 
 From top to bottom:
 
-- **Now watering** (only while a zone is open or a cycle is running): which zone, a progress gauge, and when it finishes. During a cycle it also shows where you are ("3 of 6") and when the whole cycle finishes, and it stays up between zones. It works no matter what started the zone: a cycle, a tile, a schedule or the B-hyve app. The gauge moves once a minute.
+- **Now watering** (only while a zone is open or a cycle is running): which zone, a progress gauge, and when it finishes. During a cycle it also shows where you are ("3 of 6") and when the whole cycle finishes, and it stays up between zones. It works no matter what started the zone: a cycle, a tile, a schedule or the B-hyve app. The gauge updates every 5 seconds.
   - **Skip zone** ends the zone that's watering. In a cycle, the next zone starts about 5 seconds later instead of waiting out the rest of the run time.
   - **Stop all** cancels running and queued cycles and closes every zone.
 - **Timers**
