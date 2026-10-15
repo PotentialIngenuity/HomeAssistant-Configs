@@ -375,7 +375,9 @@ sections:
           {#- The next enabled schedule that runs one of the cycles. #}
           {%- set nx = namespace(t=none, c='script.bhyve_run_all') %}
           {%- for sw in states.switch if sw.attributes.next_trigger is defined and sw.state not in ['off', 'completed'] %}
-          {%- set hit = (sw.attributes.entities or []) | select('in', cycles) | list %}
+          {#- A schedule names the script in entities (script.turn_on) or as the action itself. #}
+          {%- set ids = (sw.attributes.entities or []) + ((sw.attributes.actions or []) | map(attribute='service', default='') | list) %}
+          {%- set hit = ids | unique | select('in', cycles) | list %}
           {%- set t = as_datetime(sw.attributes.next_trigger | string, none) %}
           {%- if hit and t and (nx.t is none or t < nx.t) %}{% set nx.t = t %}{% set nx.c = hit[0] %}{% endif %}
           {%- endfor %}
