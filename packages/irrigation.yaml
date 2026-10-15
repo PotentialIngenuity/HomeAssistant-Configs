@@ -162,6 +162,15 @@ input_number:
     mode: box
     icon: mdi:weather-rainy
 
+# The phone notifications go to: a companion-app device name. Pick it from the
+# Notification phone dropdown on the page (select.notification_phone), which
+# stores it here so it survives restarts.
+input_text:
+  bhyve_notify_phone:
+    name: Notification phone (stored)
+    max: 100
+    icon: mdi:cellphone
+
 script:
   # Waters one zone, for its run time scaled by the budget unless minutes is given.
   bhyve_water_zone:
@@ -372,6 +381,123 @@ script:
             - valve.bhyve_zone_6
             - valve.bhyve_zone_7
             - valve.bhyve_zone_8
+
+  # Every irrigation notification goes through here. It sends to the phone
+  # picked in select.notification_phone (stored in input_text.bhyve_notify_phone)
+  # through its companion app's notify.mobile_app_<device name> action, and does
+  # nothing while that's empty or None. A tag replaces the earlier notification
+  # with the same tag instead of adding another.
+  bhyve_notify:
+    alias: Send an irrigation notification
+    icon: mdi:cellphone-message
+    mode: queued
+    fields:
+      title:
+        name: Title
+        required: true
+        selector:
+          text:
+      message:
+        name: Message
+        required: true
+        selector:
+          text:
+      tag:
+        name: Tag
+        selector:
+          text:
+    sequence:
+      - variables:
+          # The stored choice, not the dropdown, which is briefly None after a restart.
+          phone: "{{ states('input_text.bhyve_notify_phone') }}"
+      - condition: template
+        value_template: "{{ phone not in ['None', 'unknown', 'unavailable', ''] }}"
+      - action: "notify.mobile_app_{{ phone | slugify }}"
+        data:
+          title: "{{ title }}"
+          message: "{{ message }}"
+          data:
+            tag: "{{ tag | default('bhyve') }}"
+
+automation:
+  # A notification when a zone starts or finishes, whatever started it (a cycle,
+  # a tile, a schedule or the B-hyve app). They share one tag, so the phone
+  # shows only the latest. Turn this automation off to stop them; the page has
+  # a switch for it.
+  - id: bhyve_zone_notifications
+    alias: Irrigation – zone started or finished
+    mode: queued
+    triggers:
+      - trigger: state
+        entity_id: &zones
+          - valve.bhyve_zone_1
+          - valve.bhyve_zone_2
+          - valve.bhyve_zone_3
+          - valve.bhyve_zone_4
+          - valve.bhyve_zone_5
+          - valve.bhyve_zone_6
+          - valve.bhyve_zone_7
+          - valve.bhyve_zone_8
+        to: open
+        not_from: [unavailable, unknown]
+        id: started
+      - trigger: state
+        entity_id: *zones
+        from: open
+        to: closed
+        id: finished
+    actions:
+      - variables:
+          cycle: "{{ states('sensor.watering_cycle') }}"
+          in_cycle: "{{ ' of ' in cycle }}"
+      - if: "{{ trigger.id == 'started' }}"
+        then:
+          - variables:
+              mins: >-
+                {{ (trigger.to_state.attributes.get('current_runtime') | int(0))
+                   or (state_attr('sensor.watering_order', 'minutes') or {}).get(trigger.entity_id, 0) | int(0) }}
+          - action: script.bhyve_notify
+            data:
+              title: "{{ trigger.to_state.name }}"
+              message: >-
+                Started
+                {{- ' · ' ~ mins ~ ' min, until ' ~ as_local(now() + timedelta(minutes=mins)).strftime('%-I:%M %p') if mins > 0 }}
+                {{- ' · zone ' ~ cycle if in_cycle }}
+              tag: bhyve-zone
+        else:
+          - variables:
+              ran: "{{ ((now() - trigger.from_state.last_changed).total_seconds() / 60) | round(0) | int }}"
+          - action: script.bhyve_notify
+            data:
+              title: "{{ trigger.to_state.name }}"
+              message: >-
+                Finished · ran {{ ran }} min
+                {{- ' · zone ' ~ cycle if in_cycle }}
+              tag: bhyve-zone
+
+  # A notification when a timer's battery stays under 20% for 10 minutes.
+  # Each timer has its own tag, so the alert stays until it's dismissed.
+  - id: bhyve_battery_low
+    alias: Irrigation – timer battery low
+    mode: queued
+    triggers:
+      - trigger: numeric_state
+        entity_id:
+          - sensor.bhyve_timer_1_battery
+          - sensor.bhyve_timer_2_battery
+        below: 20
+        for:
+          minutes: 10
+    actions:
+      - variables:
+          device: >-
+            {% set d = device_id(trigger.entity_id) %}
+            {{ (device_attr(d, 'name_by_user') or device_attr(d, 'name')) if d else trigger.to_state.name }}
+      - action: script.bhyve_notify
+        data:
+          title: B-hyve battery low
+          message: "{{ device }} is at {{ trigger.to_state.state | int }}%. Replace its batteries soon."
+          tag: "bhyve-battery-{{ trigger.entity_id }}"
 
 # What is watering right now, for the "Now watering" panel on the dashboard.
 # B-hyve reports the start time and run time on the open valve. If the cloud
@@ -610,3 +736,32 @@ template:
         device_class: timestamp
         icon: mdi:flag-checkered
         state: "{{ trigger.event.data.ends if trigger.id == 'step' else none }}"
+
+  # Dropdown of the phones with the Home Assistant companion app, plus None.
+  # The choice is kept in input_text.bhyve_notify_phone; a phone that's since
+  # been removed shows as None. The phone list doesn't make the template update
+  # (and is empty at startup, before the companion app loads), so now() makes
+  # both templates re-render once a minute.
+  - select:
+      - name: Notification phone
+        unique_id: bhyve_notification_phone
+        icon: mdi:cellphone-message
+        options: >-
+          {% set ns = namespace(p=[], tick=now()) %}
+          {% for d in integration_entities('mobile_app') | map('device_id') | reject('none') | unique %}
+            {% set ns.p = ns.p + [device_attr(d, 'name')] %}
+          {% endfor %}
+          {{ ['None'] + (ns.p | reject('none') | unique | sort | list) }}
+        state: >-
+          {% set ns = namespace(p=[], tick=now()) %}
+          {% for d in integration_entities('mobile_app') | map('device_id') | reject('none') | unique %}
+            {% set ns.p = ns.p + [device_attr(d, 'name')] %}
+          {% endfor %}
+          {% set p = states('input_text.bhyve_notify_phone') %}
+          {{ p if p in ns.p else 'None' }}
+        select_option:
+          - action: input_text.set_value
+            target:
+              entity_id: input_text.bhyve_notify_phone
+            data:
+              value: "{{ option }}"

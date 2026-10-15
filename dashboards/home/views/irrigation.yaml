@@ -184,6 +184,20 @@ sections:
           - condition: state
             entity: sensor.bhyve_timer_2_battery
             state_not: unavailable
+      # Turns the zone started/finished notifications on or off (the automation
+      # in packages/irrigation.yaml). Low-battery alerts stay on.
+      - type: tile
+        entity: automation.irrigation_zone_started_or_finished
+        name: Zone notifications
+        icon: mdi:bell-ring-outline
+        tap_action:
+          action: toggle
+      # Which phone gets the notifications (None sends nothing).
+      - type: tile
+        entity: select.notification_phone
+        features_position: inline
+        features:
+          - type: select-options
 
   - type: grid
     cards:

@@ -35,6 +35,7 @@ An Irrigation dashboard and the scripts behind it for two 4-zone B-hyve timers (
    - Drag the zones into order in the Watering plan section.
    - In Schedules, add one schedule for **Run all zones** (or a timer cycle) at the time you want watering to start.
    - Turn off the B-hyve app's own programs (`switch.*_program` in HA) so the timer and HA don't both water.
+6. **Pick the phone for notifications** in **Notification phone** under Health. It lists the phones with the Home Assistant companion app. See [Notifications](#notifications).
 
 ## Entity IDs
 
@@ -68,6 +69,11 @@ The scripts find a zone's helpers from its valve's ID (`valve.bhyve_zone_3` → 
 | `script.bhyve_water_zone` | Waters one zone |
 | `script.bhyve_skip_zone`, `script.bhyve_stop_all` | Skip to the next zone; stop everything |
 | `script.bhyve_toggle_rain_delay` | Starts or cancels a rain delay |
+| `script.bhyve_notify` | Sends a notification to the chosen phone |
+| `select.notification_phone` | Which phone gets notifications (None sends nothing) |
+| `input_text.bhyve_notify_phone` | Stores that choice across restarts |
+| `automation.irrigation_zone_started_or_finished` | Zone started/finished notifications (the page's on/off switch) |
+| `automation.irrigation_timer_battery_low` | Low-battery notifications |
 | `sensor.watering_zone`, `sensor.watering_progress`, `sensor.watering_ends` | The zone watering now, its progress and end time |
 | `sensor.watering_cycle`, `sensor.watering_cycle_ends` | Position in the running cycle ("3 of 6") and its end time |
 | `sensor.watering_order` | Zone order and budget-scaled run times |
@@ -86,6 +92,8 @@ From top to bottom:
   - **Rain delay**: shows time left and the reason ("18 h left · Rain"). Tap to start a delay of the length set below it (24–168 h), or to cancel the one running.
   - **Run all zones** and **Stop all**.
   - **Health**: fault status for each timer, the Wi-Fi hub's connection and each timer's battery.
+  - **Zone notifications**: tap to turn the zone started/finished notifications on or off.
+  - **Notification phone**: which phone gets notifications. None sends nothing.
 - **Timer 1 zones / Timer 2 zones**
   - **Zone tiles**: tap to water that zone for its run time, hold for details.
   - **Run times**: a slider per zone.
@@ -116,9 +124,16 @@ Single-zone schedules don't go through the queue. Space them at least as far apa
 
 The schedules run in Home Assistant, so nothing waters while HA is down. The B-hyve app's own programs run on the timer itself. Turn those programs off (the integration exposes them as `switch.*_program`) so the two don't both water.
 
+## Notifications
+
+Notifications go to the phone picked in **Notification phone** on the page, through the Home Assistant companion app (its `notify.mobile_app_<phone name>` action). The list fills itself from the phones registered with the app; until you pick one, nothing is sent.
+
+- **Zone started / finished**, whatever started the zone (a cycle, a tile, a schedule or the B-hyve app): "Started · 15 min, until 7:15 AM · zone 3 of 6", then "Finished · ran 15 min". They share one tag, so each replaces the last and your phone shows only the latest instead of two per zone. Turn them off with **Zone notifications** on the page.
+- **Battery low**: when a timer's battery stays under 20% for 10 minutes, e.g. "Front Yard - Smart Hose Timer is at 18%". Each timer's alert stays until you dismiss it. To change the threshold, edit `below: 20` in the `bhyve_battery_low` automation.
+
 ## Updating
 
-See [Updating](../README.md#updating) for the general rules. For this page, a change to `packages/irrigation.yaml` needs Scripts, Input numbers, Counters and Template entities reloaded (Developer tools → YAML), or a restart if it adds a new kind of helper.
+See [Updating](../README.md#updating) for the general rules. For this page, a change to `packages/irrigation.yaml` needs Automations, Scripts, Input numbers, Input texts, Counters and Template entities reloaded (Developer tools → YAML), or a restart if it adds a new kind of helper.
 
 ## Troubleshooting
 
@@ -126,4 +141,5 @@ See [Updating](../README.md#updating) for the general rules. For this page, a ch
 - **A tile says "Entity not available"**: a B-hyve entity hasn't been renamed to the ID in the table above.
 - **The plan shows +0:15 instead of clock times**: no enabled schedule runs a cycle. Schedules for a single zone don't count.
 - **Now watering doesn't appear**: check that `sensor.watering_zone` changes from Idle when a zone opens (Developer tools → States). If it stays Idle, the valve IDs don't match `valve.bhyve_zone_N`.
+- **No notifications**: check that **Notification phone** is set, then run `script.bhyve_notify` from Developer tools → Actions with a title and message. If the trace shows an "action not found" error, your phone's notify action doesn't follow `notify.mobile_app_<phone name>` (e.g. the phone was renamed in the app); look it up under Developer tools → Actions and rename the device to match. If the test works but zone notifications don't, check that **Zone notifications** is on.
 - **Times are off by a minute**: each zone's start includes the 30-second buffer after the zone before it, and times are rounded down to the minute.
