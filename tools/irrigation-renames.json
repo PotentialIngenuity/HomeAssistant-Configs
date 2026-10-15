@@ -17,12 +17,10 @@
   {"from":"sensor.back_yard_smart_hose_timer_back_west_zone_history","to":"sensor.bhyve_zone_8_history"},
   {"from":"switch.front_yard_smart_hose_timer_rain_delay","to":"switch.bhyve_timer_1_rain_delay"},
   {"from":"select.front_yard_smart_hose_timer_device_mode","to":"select.bhyve_timer_1_mode"},
-  {"from":"sensor.front_yard_smart_hose_timer_next_watering","to":"sensor.bhyve_timer_1_next_watering"},
   {"from":"binary_sensor.front_yard_smart_hose_timer_fault","to":"binary_sensor.bhyve_timer_1_fault"},
   {"from":"sensor.front_yard_smart_hose_timer_battery_level","to":"sensor.bhyve_timer_1_battery"},
   {"from":"switch.back_yard_smart_hose_timer_rain_delay","to":"switch.bhyve_timer_2_rain_delay"},
   {"from":"select.back_yard_smart_hose_timer_device_mode","to":"select.bhyve_timer_2_mode"},
-  {"from":"sensor.back_yard_smart_hose_timer_next_watering","to":"sensor.bhyve_timer_2_next_watering"},
   {"from":"binary_sensor.back_yard_smart_hose_timer_fault","to":"binary_sensor.bhyve_timer_2_fault"},
   {"from":"sensor.back_yard_smart_hose_timer_battery_level","to":"sensor.bhyve_timer_2_battery"},
   {"from":"binary_sensor.b_hyve_wi_fi_hub_connected","to":"binary_sensor.bhyve_hub_connected"}

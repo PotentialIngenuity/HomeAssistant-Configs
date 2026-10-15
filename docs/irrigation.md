@@ -46,7 +46,6 @@ The easiest setup is to **rename your B-hyve entities to match** these IDs: open
 | `valve.bhyve_zone_5` … `valve.bhyve_zone_8` | Timer 2 zones |
 | `switch.bhyve_timer_1_rain_delay`, `switch.bhyve_timer_2_rain_delay` | Rain delay |
 | `select.bhyve_timer_1_mode`, `select.bhyve_timer_2_mode` | Timer mode (auto/off) |
-| `sensor.bhyve_timer_1_next_watering`, `sensor.bhyve_timer_2_next_watering` | Next watering |
 | `sensor.bhyve_zone_1_history` … `sensor.bhyve_zone_8_history` | Zone history (last run, minutes, gallons) |
 | `binary_sensor.bhyve_timer_1_fault`, `binary_sensor.bhyve_timer_2_fault` | Station faults |
 | `binary_sensor.bhyve_hub_connected` | Wi-Fi hub online (only if you have a hub) |
@@ -73,6 +72,7 @@ The scripts find a zone's helpers from its valve's ID (`valve.bhyve_zone_3` → 
 | `sensor.watering_cycle`, `sensor.watering_cycle_ends` | Position in the running cycle ("3 of 6") and its end time |
 | `sensor.watering_order` | Zone order and budget-scaled run times |
 | `sensor.timer_1_rain_delay_status`, `sensor.timer_2_rain_delay_status` | Rain delay time left and reason |
+| `sensor.timer_1_next_run`, `sensor.timer_2_next_run` | When each timer's first zone starts in the next scheduled cycle |
 
 ## The Irrigation page
 
@@ -82,7 +82,7 @@ From top to bottom:
   - **Skip zone** ends the zone that's watering. In a cycle, the next zone starts about 5 seconds later instead of waiting out the rest of the run time.
   - **Stop all** cancels running and queued cycles and closes every zone.
 - **Timers**
-  - Each timer's mode and next run.
+  - Each timer's mode and next run: when its first zone starts in the next scheduled cycle, from the Schedules section (B-hyve's own next watering is empty once its programs are off). "Not scheduled" means no enabled schedule waters that timer's zones; "· rain delay" means the delay will still be on, so they'll be skipped.
   - **Rain delay**: shows time left and the reason ("18 h left · Rain"). Tap to start a delay of the length set below it (24–168 h), or to cancel the one running.
   - **Run all zones** and **Stop all**.
   - **Health**: fault status for each timer, the Wi-Fi hub's connection and each timer's battery.

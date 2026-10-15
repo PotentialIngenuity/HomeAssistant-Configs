@@ -130,11 +130,9 @@ sections:
           - type: numeric-input
             style: buttons
       - type: tile
-        entity: sensor.bhyve_timer_1_next_watering
-        name: Timer 1 next run
+        entity: sensor.timer_1_next_run
       - type: tile
-        entity: sensor.bhyve_timer_2_next_watering
-        name: Timer 2 next run
+        entity: sensor.timer_2_next_run
       - type: tile
         entity: script.bhyve_run_all
         name: Run all zones
