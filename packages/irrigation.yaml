@@ -31,7 +31,7 @@ counter:
     restore: true
 
 input_number:
-  bhyve_zone_1_minutes: &zone_minutes
+  bhyve_zone_1_minutes:
     name: Zone 1 run time
     min: 0
     max: 60
@@ -40,28 +40,63 @@ input_number:
     mode: slider
     icon: mdi:timer-outline
   bhyve_zone_2_minutes:
-    <<: *zone_minutes
     name: Zone 2 run time
+    min: 0
+    max: 60
+    step: 1
+    unit_of_measurement: min
+    mode: slider
+    icon: mdi:timer-outline
   bhyve_zone_3_minutes:
-    <<: *zone_minutes
     name: Zone 3 run time
+    min: 0
+    max: 60
+    step: 1
+    unit_of_measurement: min
+    mode: slider
+    icon: mdi:timer-outline
   bhyve_zone_4_minutes:
-    <<: *zone_minutes
     name: Zone 4 run time
+    min: 0
+    max: 60
+    step: 1
+    unit_of_measurement: min
+    mode: slider
+    icon: mdi:timer-outline
   bhyve_zone_5_minutes:
-    <<: *zone_minutes
     name: Zone 5 run time
+    min: 0
+    max: 60
+    step: 1
+    unit_of_measurement: min
+    mode: slider
+    icon: mdi:timer-outline
   bhyve_zone_6_minutes:
-    <<: *zone_minutes
     name: Zone 6 run time
+    min: 0
+    max: 60
+    step: 1
+    unit_of_measurement: min
+    mode: slider
+    icon: mdi:timer-outline
   bhyve_zone_7_minutes:
-    <<: *zone_minutes
     name: Zone 7 run time
+    min: 0
+    max: 60
+    step: 1
+    unit_of_measurement: min
+    mode: slider
+    icon: mdi:timer-outline
   bhyve_zone_8_minutes:
-    <<: *zone_minutes
     name: Zone 8 run time
+    min: 0
+    max: 60
+    step: 1
+    unit_of_measurement: min
+    mode: slider
+    icon: mdi:timer-outline
   # Position of each zone in a cycle. Lowest runs first; ties go by zone number.
-  bhyve_zone_1_order: &zone_order
+  bhyve_zone_1_order:
     name: Zone 1 order
     min: 1
     max: 8
@@ -69,26 +104,54 @@ input_number:
     mode: box
     icon: mdi:order-numeric-ascending
   bhyve_zone_2_order:
-    <<: *zone_order
     name: Zone 2 order
+    min: 1
+    max: 8
+    step: 1
+    mode: box
+    icon: mdi:order-numeric-ascending
   bhyve_zone_3_order:
-    <<: *zone_order
     name: Zone 3 order
+    min: 1
+    max: 8
+    step: 1
+    mode: box
+    icon: mdi:order-numeric-ascending
   bhyve_zone_4_order:
-    <<: *zone_order
     name: Zone 4 order
+    min: 1
+    max: 8
+    step: 1
+    mode: box
+    icon: mdi:order-numeric-ascending
   bhyve_zone_5_order:
-    <<: *zone_order
     name: Zone 5 order
+    min: 1
+    max: 8
+    step: 1
+    mode: box
+    icon: mdi:order-numeric-ascending
   bhyve_zone_6_order:
-    <<: *zone_order
     name: Zone 6 order
+    min: 1
+    max: 8
+    step: 1
+    mode: box
+    icon: mdi:order-numeric-ascending
   bhyve_zone_7_order:
-    <<: *zone_order
     name: Zone 7 order
+    min: 1
+    max: 8
+    step: 1
+    mode: box
+    icon: mdi:order-numeric-ascending
   bhyve_zone_8_order:
-    <<: *zone_order
     name: Zone 8 order
+    min: 1
+    max: 8
+    step: 1
+    mode: box
+    icon: mdi:order-numeric-ascending
   # How long a rain delay lasts when you start one from the dashboard.
   bhyve_rain_delay_hours:
     name: Rain delay length
